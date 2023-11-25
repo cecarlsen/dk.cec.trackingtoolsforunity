@@ -6,12 +6,10 @@ A set of tools to make camera and video projector calibration slightly easier in
 
 #### Dependencies
 - Unity 2023.1 (it may work with other versions, but no promises)
-- [OpenCV for Unity](https://assetstore.unity.com/packages/tools/integration/opencv-for-unity-21088) (sold on the Asset Store). Tested with version 2.5.6.
-- [Optional] [Azure Kinect Examples for Unity](https://assetstore.unity.com/packages/tools/integration/azure-kinect-examples-for-unity-149700) (sold on the Unity Asset Store). If you want to use *TrackingTools.KinectAzure*. Tested with version 1.19.
+- [OpenCV for Unity](https://assetstore.unity.com/packages/tools/integration/opencv-for-unity-21088) (sold on the Asset Store). Tested with version 2.5.7.
 - [Optional] When working with the ProjectorFromCameraExtrinsicsEstimator it can be convenient to full-screen a game window from the editor. I use [Fullscreen Editor](https://assetstore.unity.com/packages/tools/utilities/fullscreen-editor-69534) for this.
 
-## TrackingTools
-MonoBehaviours:
+## MonoBehaviours
 
 #### WebCameraTextureProvider
 Creates and forwards a Unity WebCamTexture.
@@ -56,13 +54,6 @@ Find the extrinsics of a video projector (indirectly also finding the intrinsics
   - It is absolutely crucial for precision that movement is minimised. Even more so for projector calibration because there is a frame delay during sampling. Always support the calibration board against something. For example a tripod with variable height.
 
 
-## TrackingTools.KinectAzure
-MonoBehaviours:
-
-#### KinectAzureTexture2DProvider  
-Creates and forwards a IR and/or colour RenderTextures from the Kinect Azure.
-
-
 ## Additional notes
 
 #### Printing calibration boards
@@ -80,7 +71,7 @@ Creates and forwards a IR and/or colour RenderTextures from the Kinect Azure.
 ### Further reading
 - [The Magic Behind Camera Calibration](https://medium.com/@hey_duda/the-magic-behind-camera-calibration-8596b7ddcd71) by Alexander Duda.
 
-### Credits
+## Credits
 This work could not have been achieved without much inspiration from examples posted by kind people online.
 
 - [Elliot Woods](http://elliotwoods.info/) and [Kyle McDonald](https://kylemcdonald.net/) did a projector and camera calibration [workshop](http://artandcode.com/3d/workshops/4a-calibrating-projectors-and-cameras/) in 2011.
