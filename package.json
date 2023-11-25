@@ -1,0 +1,20 @@
+{
+  "name": "dk.cec.trackingtoolsforunity",
+  "version": "0.1.2",
+  "displayName": "Tracking Tools for Unity",
+  "description": "Camera and projector calibration helpers based on OpenCV.",
+  "author": {
+    "name": "Carl Emil Carlsen",
+    "url": "https://cec.dk"
+  },
+  "unity": "2023.1",
+  "type": "code",
+  "documentationUrl": "https://github.com/cecarlsen/TrackingToolsForUnity/blob/master/README.md",
+  "samples": [
+    {
+      "displayName": "Samples",
+      "description": "All samples.",
+      "path": "Samples~"
+    }
+  ]
+}
