@@ -4,12 +4,12 @@
 	{
 		_MainTex ("Texture", 2D) = "white" {}
 		_Brightness ("Brightness", Float) = 1.0
+		[Toggle(FLIP_VERTICALLY)] _FlipVertically("Flip Vertically", Int) = 0
 	}
 	SubShader
 	{
-		//Tags { "RenderType"="Opaque" }
 		Tags{ "Queue" = "Transparent" "RenderType" = "Transparent" }
-		Blend SrcAlpha OneMinusSrcAlpha // Traditional transparency
+		Blend SrcAlpha OneMinusSrcAlpha
 		Cull Off
 
 		Pass
@@ -37,12 +37,14 @@
 			sampler2D _MainTex;
 			float4 _MainTex_ST;
 			half _Brightness;
+			int _FlipVertically;
 
 
 			v2f Vert( appdata v )
 			{
 				v2f o;
 				o.vertex = UnityObjectToClipPos(v.vertex);
+				if( _FlipVertically > 0 ) v.uv.y = 1.0 - v.uv.y;
 				o.uv = TRANSFORM_TEX(v.uv, _MainTex);
 				o.color = v.color;
 				return o;
