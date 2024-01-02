@@ -105,7 +105,9 @@ namespace TrackingTools
 		{
 			int camTexCvType;
 			Scalar defaultValue;
-			switch( texture.graphicsFormat ) {
+			switch( texture.graphicsFormat )
+			{
+				case GraphicsFormat.R8_SRGB:
 				case GraphicsFormat.R8_UNorm:
 					camTexCvType = CvType.CV_8UC1;
 					defaultValue = new Scalar( 1 );

@@ -1,3 +1,7 @@
+## 0.1.3  (2024/01/02)
+
+- CameraFromCheckerboardExtrinsicsEstimator support for linear lenses.
+
 ## 0.1.2  (2023/09/29)
 
 - Added LensUndistorter, a GPU alternative to OpenCV's Calib3d.undistort, or combined Calib3d.initUndistortRectifyMap and Imgproc.remap.

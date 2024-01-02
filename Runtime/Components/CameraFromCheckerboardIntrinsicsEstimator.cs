@@ -22,10 +22,11 @@ namespace TrackingTools
 		[SerializeField] Checkerboard _checkerboard = null;
 		[SerializeField] int _desiredSampleCount = 4; // Four perfect samples should be ideal https://medium.com/@hey_duda/the-magic-behind-camera-calibration-8596b7ddcd71
 		[SerializeField] bool _flipSourceTextureVertically = false;
+		[SerializeField,Tooltip("Some lenses are designed with no distortion.")] bool _linearOpticalLens = false;
 		[SerializeField,Tooltip("Only use when you have bad lighting conditions.")] bool _normalizeSourceTexture = false;
 
 		[Header("Output")]
-		[SerializeField] string _intrinsicsFileName = "DefaultCamera_1280x720";
+		[SerializeField] string _intrinsicsFileName = "240101_DefaultCamera_1280x720";
 		[SerializeField] bool _addErrorValueToFileName = false;
 
 		[ Header("UI")]
@@ -175,28 +176,31 @@ namespace TrackingTools
 
 			// During testing, undistort before.
 			if( _state == State.Testing ) {
-				Calib3d.undistort( _camTexGrayMat, _camTexGrayUndistortMat, _intrinsicsCalibrator.sensorMat, _intrinsicsCalibrator.distortionCoeffsMat );
+				if( !_linearOpticalLens ) Calib3d.undistort( _camTexGrayMat, _camTexGrayUndistortMat, _intrinsicsCalibrator.sensorMat, _intrinsicsCalibrator.distortionCoeffsMat );
+				else _camTexGrayMat.copyTo( _camTexGrayUndistortMat );
 			}
 
 			// Find chessboard.
 			Mat chessboardSourceMat = _state == State.Calibrating ? _camTexGrayMat : _camTexGrayUndistortMat;
 			bool foundBoard = TrackingToolsHelper.FindChessboardCorners( chessboardSourceMat, _checkerboard.checkerPatternSize, ref _chessCornersImageMat, fastAndImprecise: true, _checkerboard.hasMaker );
-			if( foundBoard ) TrackingToolsHelper.DrawFoundPattern( chessboardSourceMat, _checkerboard.checkerPatternSize, _chessCornersImageMat );
-
-			// During calibration, undistort after.
-			if( _state == State.Calibrating ) {
-				if( _intrinsicsCalibrator.sampleCount > correctDistortionSampleCountThreshold ) {
-					Calib3d.undistort( _camTexGrayMat, _camTexGrayUndistortMat, _intrinsicsCalibrator.sensorMat, _intrinsicsCalibrator.distortionCoeffsMat );
-				} else {
-					_camTexGrayMat.copyTo( _camTexGrayUndistortMat );
-				}
-			}
 
 			// State dependent updates.
 			switch( _state )
 			{
 				case State.Calibrating: UpdateCalibration( foundBoard ); break;
 				case State.Testing: UpdateTesting( foundBoard ); break;
+			}
+
+			// Draw chessboard.
+			if( foundBoard ) TrackingToolsHelper.DrawFoundPattern( chessboardSourceMat, _checkerboard.checkerPatternSize, _chessCornersImageMat );
+
+			// During calibration, undistort after.
+			if( _state == State.Calibrating ) {
+				if( !_linearOpticalLens && _intrinsicsCalibrator.sampleCount > correctDistortionSampleCountThreshold ) {
+					Calib3d.undistort( _camTexGrayMat, _camTexGrayUndistortMat, _intrinsicsCalibrator.sensorMat, _intrinsicsCalibrator.distortionCoeffsMat );
+				} else {
+					_camTexGrayMat.copyTo( _camTexGrayUndistortMat );
+				}
 			}
 
 			// UI.
@@ -224,18 +228,18 @@ namespace TrackingTools
 			if( _stableFrameCount == stableFrameCountThreshold )
 			{
 				// Find the calibration board again, this time with higher precision.
-				Mat chessboardSourceMat = _state == State.Calibrating ? _camTexGrayMat : _camTexGrayUndistortMat;
-				foundBoard = TrackingToolsHelper.FindChessboardCorners( chessboardSourceMat, _checkerboard.checkerPatternSize, ref _chessCornersImageMat, fastAndImprecise: false, _checkerboard.hasMaker );
+				foundBoard = TrackingToolsHelper.FindChessboardCorners( _camTexGrayMat, _checkerboard.checkerPatternSize, ref _chessCornersImageMat, fastAndImprecise: false, _checkerboard.hasMaker );
 				if( !foundBoard ) {
 					// Abort.
 					_successFrameCount = 0;
 					_stableFrameCount = 0;
+					Debug.LogWarning( logPrepend + "Didn't find chessboard.\n" );
 					return;
 				}
 
 				// Add sample.
 				_intrinsicsCalibrator.AddSample( _chessCornersRealModelMat, _chessCornersImageMat );
-				_intrinsicsCalibrator.UpdateIntrinsics();
+				_intrinsicsCalibrator.UpdateIntrinsics( samplesHaveDistortion: !_linearOpticalLens );
 				_previewFlasher.Start();
 				_rmsErrorText.text = _intrinsicsCalibrator.rmsError.ToString( "F3" );
 				_stableFrameCount = 0;
