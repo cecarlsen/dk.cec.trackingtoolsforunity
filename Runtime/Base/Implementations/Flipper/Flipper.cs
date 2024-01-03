@@ -18,7 +18,7 @@ namespace TrackingTools
 		}
 
 
-		public void Flip( RenderTexture texture )
+		public void FlipVertically( RenderTexture texture )
 		{
 			RenderTexture tempTexture = RenderTexture.GetTemporary( texture.descriptor );
 			Graphics.Blit( texture, tempTexture, _material );
@@ -28,7 +28,7 @@ namespace TrackingTools
 		}
 
 
-		public void Flip( Texture sourceTexture, RenderTexture destinationTexture )
+		public void FlipVertically( Texture sourceTexture, RenderTexture destinationTexture )
 		{
 			Graphics.Blit( sourceTexture, destinationTexture, _material );
 		}

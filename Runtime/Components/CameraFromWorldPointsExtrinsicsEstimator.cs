@@ -276,9 +276,9 @@ namespace TrackingTools
 
 						if( _isPhysicalCameraTextureDistorted ){
 							_lensUndistorter.Undistort( _physicalCameraTexture, _processedPhysicalCameraTexture, _isPhysicalCameraTextureFlipped );
-							_flipper.Flip( _processedPhysicalCameraTexture );
+							_flipper.FlipVertically( _processedPhysicalCameraTexture );
 						} else if( _isPhysicalCameraTextureFlipped ) {
-							_flipper.Flip( _physicalCameraTexture, _processedPhysicalCameraTexture );
+							_flipper.FlipVertically( _physicalCameraTexture, _processedPhysicalCameraTexture );
 						}
 				
 						_physicalCameraImageUI.texture = _isPhysicalCameraTextureFlipped || _isPhysicalCameraTextureDistorted ? _processedPhysicalCameraTexture : _physicalCameraTexture;
