@@ -16,10 +16,10 @@ namespace TrackingTools
 {
 	public class ProjectorFromCameraExtrinsicsCalibrator
 	{
-		List<Mat> _patternWorldSamples;
 		Mat _cameraSensorMat;
 		Mat _projectorSensorMat;
 		MatOfDouble _noDistCoeffs;
+		List<Mat> _patternWorldSamples;
 		List<Mat> _cameraPatternImageSamples;
 		List<Mat> _projectorPatternImageSamples;
 		Mat _rotation3x3Mat;
@@ -77,8 +77,8 @@ namespace TrackingTools
 		/// </summary>
 		public void Update( Intrinsics cameraIntrinsics, Intrinsics projectorIntrinsics, Size textureSize )
 		{
-			int w = (int) textureSize.width;
-			int h = (int) textureSize.height;
+			//int w = (int) textureSize.width;
+			//int h = (int) textureSize.height;
 
 			cameraIntrinsics.ApplyToToOpenCV( ref _cameraSensorMat );
 			projectorIntrinsics.ApplyToToOpenCV( ref _projectorSensorMat );
@@ -104,7 +104,7 @@ namespace TrackingTools
 				_patternWorldSamples, _cameraPatternImageSamples, _projectorPatternImageSamples,
 				_cameraSensorMat, _noDistCoeffs,
 				_projectorSensorMat, _noDistCoeffs,
-				textureSize,
+				textureSize, // This is fine. Texture size is ignored when using CALIB_FIX_INTRINSIC https://stackoverflow.com/questions/35128281/different-image-size-opencv-stereocalibrate
 				_rotation3x3Mat, _translationVecMat, _essentialMat, _fundamentalMat,
 				flag
 			);

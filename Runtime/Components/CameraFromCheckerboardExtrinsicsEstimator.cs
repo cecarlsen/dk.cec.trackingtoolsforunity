@@ -1,5 +1,5 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2020-2022
+	Copyright © Carl Emil Carlsen 2020-2024
 	http://cec.dk
 */
 
@@ -91,7 +91,7 @@ namespace TrackingTools
 		void Awake()
 		{
 			if( !Intrinsics.TryLoadFromFile( _intrinsicsFileName, out _intrinsics ) ) {
-				Debug.LogError( logPrepend + "Loadind intrinsics file '" + _intrinsicsFileName + "' failed.\n" );
+				Debug.LogError( logPrepend + "Loading intrinsics file '" + _intrinsicsFileName + "' failed.\n" );
 				enabled = false;
 				return;
 			}
@@ -143,16 +143,16 @@ namespace TrackingTools
 
 		void OnDestroy()
 		{
-			if( _camTexMat != null ) _camTexMat.release();
 			if( _tempTransferTexture ) Destroy( _tempTransferTexture );
-			if( _chessCornersImageMat != null ) _chessCornersImageMat.release();
 			if( _previewMaterial ) Destroy( _previewMaterial );
-			if( _arTexture ) _arTexture.Release();
-			if( _chessPatternTexture ) _chessPatternTexture.Release();
 			if( _patternRenderMaterial ) Destroy( _patternRenderMaterial );
-			if( _extrinsicsCalibrator != null ) _extrinsicsCalibrator.Release();
-			if( _undistortMap1 != null ) _undistortMap1.release();
-			if( _undistortMap2 != null ) _undistortMap2.release();
+			_camTexMat?.release();
+			_chessCornersImageMat?.release();
+			_arTexture?.Release();
+			_chessPatternTexture?.Release();
+			_extrinsicsCalibrator?.Release();
+			_undistortMap1?.release();
+			_undistortMap2?.release();
 
 			Reset();
 		}
@@ -252,7 +252,7 @@ namespace TrackingTools
 			_arTexture.name = "AR Texture";
 
 			// Create undistort map (sensorMat remains unchanged even through it is passed as newCameraMatrix).
-			Calib3d.initUndistortRectifyMap( _sensorMat, _distortionCoeffsMat, new Mat(), _sensorMat, new Size( _cameraSourceTexture.width, _cameraSourceTexture.height ), CvType.CV_32FC1, _undistortMap1, _undistortMap2 );
+			Calib3d.initUndistortRectifyMap( _sensorMat, _distortionCoeffsMat, new Mat(), _sensorMat, new Size( w, h ), CvType.CV_32FC1, _undistortMap1, _undistortMap2 );
 
 			// Update UI.
 			_aspectFitter.aspectRatio = w / (float) h;
@@ -269,10 +269,10 @@ namespace TrackingTools
 
 		void Reset()
 		{
-			if( _sensorMat != null ) _sensorMat.Dispose();
-			if( _distortionCoeffsMat != null ) _distortionCoeffsMat.Dispose();
-			if( _camTexGrayMat != null ) _camTexGrayMat.Dispose();
-			if( _camTexGrayUndistortMat != null ) _camTexGrayUndistortMat.Dispose();
+			_sensorMat?.Dispose();
+			_distortionCoeffsMat?.Dispose();
+			_camTexGrayMat?.Dispose();
+			_camTexGrayUndistortMat?.Dispose();
 			if( _processedCameraTexture ) Destroy( _processedCameraTexture );
 		}
 

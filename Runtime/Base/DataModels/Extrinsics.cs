@@ -9,6 +9,7 @@
 using System.IO;
 using UnityEngine;
 using OpenCVForUnity.CoreModule;
+using static UnityEditor.FilePathAttribute;
 
 namespace TrackingTools
 {
@@ -38,6 +39,13 @@ namespace TrackingTools
 			}
 
 			transform.SetPositionAndRotation( t, r );
+		}
+
+
+		public void Inverse()
+		{
+			rotation = Quaternion.Inverse( rotation );
+			translation = rotation * -translation;
 		}
 
 

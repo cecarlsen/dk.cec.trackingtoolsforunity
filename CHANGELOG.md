@@ -1,3 +1,7 @@
+## 0.1.4  (2024/01/04)
+
+- Added CameraToCameraFromCheckerboardExtrinsicsEstimator for stereo calibration.
+
 ## 0.1.3  (2024/01/02)
 
 - CameraFromCheckerboardExtrinsicsEstimator support for linear lenses.
