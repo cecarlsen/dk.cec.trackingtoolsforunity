@@ -339,7 +339,7 @@ namespace TrackingTools
 			// Compute!
 			Calib3d.stereoCalibrate
 			(
-				_chessCornersWorldSamplesMat, _chessCornersImageSamplesMatA, _chessCornersImageSamplesMatB, // B to A
+				_chessCornersWorldSamplesMat, _chessCornersImageSamplesMatA, _chessCornersImageSamplesMatB,
 				_sensorMatA, _noDistCoeffs,
 				_sensorMatB, _noDistCoeffs,
 				new Size(),
@@ -350,7 +350,6 @@ namespace TrackingTools
 			// Save.
 			Extrinsics extrinsics = new Extrinsics();
 			extrinsics.UpdateFromOpenCvStereoCalibrate( _rotation3x3Mat, _translationVecMat );
-			extrinsics.Inverse();
 			extrinsics.SaveToFile( _defaultExtrinsicsFileName );
 
 			Debug.Log( logPrepend + "Saved extrinsics to file.\n" + _defaultExtrinsicsFileName );

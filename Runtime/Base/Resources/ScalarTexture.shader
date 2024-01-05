@@ -1,4 +1,4 @@
-﻿Shader "Hidden/SingleChannelTexture"
+﻿Shader "UI/ScalarTexture"
 {
 	Properties
 	{

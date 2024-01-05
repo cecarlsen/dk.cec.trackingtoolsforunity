@@ -9,7 +9,6 @@
 using System.IO;
 using UnityEngine;
 using OpenCVForUnity.CoreModule;
-using static UnityEditor.FilePathAttribute;
 
 namespace TrackingTools
 {

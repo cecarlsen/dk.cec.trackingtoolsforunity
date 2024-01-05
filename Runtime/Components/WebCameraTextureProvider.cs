@@ -8,7 +8,7 @@ using UnityEngine.Events;
 
 namespace TrackingTools
 {
-	public class WebCameraTextureProvider : MonoBehaviour
+	public class WebCameraTextureProvider : MonoBehaviour // DOTO: Inherit from CameraTextureProvider.
 	{
 		[SerializeField] int _requestedDeviceIndex = 0;
 		[SerializeField] int _requestedWidth = 1920; // Because device.availableResolutions returns null https://docs.unity3d.com/2019.3/Documentation/ScriptReference/WebCamDevice-availableResolutions.html
