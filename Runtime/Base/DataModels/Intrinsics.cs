@@ -115,6 +115,20 @@ namespace TrackingTools
 		/// </summary>
 		public bool isValid => _distortionCoeffs != null; // If json deserialization failed _distortionCoeffs will be null.
 		
+		/// <summary>
+		/// Lens shift value, as applied to Unity cameras.
+		/// </summary>
+		public Vector2 lensShiftNormalized =>
+			new Vector2(
+				(float) -( ( _cx / (double) _referenceResolution.x ) - 0.5 ),
+				(float) ( ( _cy / (double) _referenceResolution.y ) - 0.5 )
+			);
+
+		/// <summary>
+		/// Vertical field of view (fov) angle in degrees as applied to Unity cameras.
+		/// </summary>
+		public float verticalFieldOfView => Mathf.Atan2( (float) _cy, _referenceResolution.y ) * 2f * Mathf.Rad2Deg;
+
 
 		static readonly string logPrepend = "<b>[" + nameof( Intrinsics ) + "]</b> ";
 		
@@ -312,18 +326,6 @@ namespace TrackingTools
 		}
 
 
-		/*
-		public void ToProjectionMatrix
-		(
-			float near, float far,
-			ref Matrix4x4 projectionMatrix
-		)
-		{
-
-		}
-		*/
-
-
 		void UpdateFromOpenCVCameraIntrinsicsMatrix( Mat cameraIntrinsicsMat )
 		{
 			_fx = cameraIntrinsicsMat.ReadValue( 0, 0 );
@@ -340,15 +342,6 @@ namespace TrackingTools
 			cameraIntrinsicsMat.WriteValue( _cx, 0, 2 );
 			cameraIntrinsicsMat.WriteValue( _cy, 1, 2 );
 		}
-
-
-		/*
-		public void FlipY()
-		{
-			fy = -fy;
-			cy = 1 - cy;
-		}
-		*/
 
 
 		public override string ToString()

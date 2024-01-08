@@ -11,8 +11,9 @@ namespace TrackingTools
 	public class CameraIntrinsicsLoader : MonoBehaviour
 	{
 		[SerializeField] string _intrinsicsFileName = "DefaultCamera";
-		[SerializeField] bool _loadOnAwake = true;
-		[SerializeField] bool _loadOnEnable = false;
+		[SerializeField] AutoLoadTime _loadTime = AutoLoadTime.Awake;
+
+		[System.Serializable] enum AutoLoadTime { Awake, OnEnable, Start, Off }
 
 
 		static string logPrepend = "<b>[" + nameof( CameraIntrinsicsLoader) + "]</b> ";
@@ -20,13 +21,19 @@ namespace TrackingTools
 
 		void Awake()
 		{
-			if( _loadOnAwake ) LoadAndApply();
+			if( _loadTime == AutoLoadTime.Awake ) LoadAndApply();
 		}
 
 
 		void OnEnable()
 		{
-			if( _loadOnEnable ) LoadAndApply();
+			if( _loadTime == AutoLoadTime.OnEnable ) LoadAndApply();
+		}
+
+
+		void Start()
+		{
+			if( _loadTime == AutoLoadTime.Start ) LoadAndApply();
 		}
 
 
