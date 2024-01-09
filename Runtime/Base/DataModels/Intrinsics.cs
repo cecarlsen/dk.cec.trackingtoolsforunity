@@ -1,5 +1,5 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2020-2022
+	Copyright © Carl Emil Carlsen 2020-2024
 	http://cec.dk
 
 	Camera intriniscs values stored as defined by OpenCV.
@@ -13,13 +13,26 @@
 		[ fx,  0, cx ]
 		[  0, fy, cy ]
 		[  0,  0,  1 ]
+	
+	The two focal length values, fx and fy, are the product of the physical focal length
+	(millimeters) and sensor pixel size (pixels per millimeter). This is because sensors
+	can have non-square pixels.
+	https://stackoverflow.com/a/16330470
+
+	Both the actual physical focal length and sensor pixel size are unknowns.
 		
-		https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
+		fx = F * sx
+		fy = F * sy
+
+	OpenCV docs.
+	https://docs.opencv.org/3.4/d4/d94/tutorial_camera_calibration.html
+	https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
 */
 
-using System.IO;
 using UnityEngine;
+using System.IO;
 using OpenCVForUnity.CoreModule;
+using UnityEngine.Serialization;
 
 namespace TrackingTools
 {
@@ -29,23 +42,23 @@ namespace TrackingTools
 		[SerializeField] double _cx, _cy;
 		[SerializeField] double _fx, _fy;
 		[SerializeField] double[] _distortionCoeffs; // Radial and tangential distortion coefficients as defined by OpenCV: [k1,k2,p1,p2,k3,k4,k5,k6,s1,s2,s3,s4,taux,tauy] of 4, 5, 8, 12 or 14 elements.
-		[SerializeField] Vector2Int _referenceResolution;
+		[SerializeField,FormerlySerializedAs( "_referenceResolution" )] Vector2Int _resolution;
 		[SerializeField] double _rmsError; // Root mean square error.
 
 
 		const int defaultDistortionCoeffCount = 5;
 
 		/// <summary>
-		/// The horizontal principal point (px, optical center) as defined by OpenCV; an offset measure in pixels from upper-left corner (right is positive).
-		/// If camera sensor is placed perfectly on-axis the value will be: ( referenceResolution.x * 0.5 ).
-		/// Lens shift can be derived: ( shiftX = 0.5 - cx / referenceResolution.x )
+		/// The horizontal principal point (px, optical center) as defined by OpenCV; an offset measured in pixels from upper-left corner (right is positive).
+		/// If camera sensor is placed perfectly on-axis the value will be: ( _resolution.x * 0.5 ).
+		/// Lens shift can be derived: ( shiftX = 0.5 - cx / _resolution.x )
 		/// </summary>
 		public double cx => _cx;
 
 		/// <summary>
-		/// The vertical principal point (py, optical center) as defined by OpenCV; an offset measure in pixels from upper-left corner (down is positive).
-		/// If camera sensor is placed perfectly on-axis the value will be: ( referenceResolution.y * 0.5 ).
-		/// Lens shift can be derived: ( shiftX = 0.5 - cx / referenceResolution.y )
+		/// The vertical principal point (py, optical center) as defined by OpenCV; an offset measured in pixels from upper-left corner (down is positive).
+		/// If camera sensor is placed perfectly on-axis the value will be: ( _resolution.y * 0.5 ).
+		/// Lens shift can be derived: ( shiftY = 0.5 - cy / _resolution.y )
 		/// </summary>
 		public double cy => _cy;
 
@@ -57,7 +70,7 @@ namespace TrackingTools
 
 		/// <summary>
 		/// Vertical focal length as defined by OpenCV.
-		/// Product of the physical focal length of the lens (F measured in mm) and the horizontal size of the (potentially non-square) individual imager elements (sx measured in px/mm). Equation: ( fy = F * sy ).
+		/// Product of the physical focal length of the lens (F measured in mm) and the vertical size of the (potentially non-square) individual imager elements (sy measured in px/mm). Equation: ( fy = F * sy ).
 		/// </summary>
 		public double fy => _fy;
 
@@ -104,11 +117,11 @@ namespace TrackingTools
 		/// <summary>
 		/// Reference image pixel resolution. The values of cx, cy, fx, fy must be relative to this.
 		/// </summary>
-		public Vector2Int referenceResolution => _referenceResolution;
+		public Vector2Int referenceResolution => _resolution;
 
-		public int width => _referenceResolution.x;
-		public int height => _referenceResolution.y;
-		public float aspect => _referenceResolution.x / (float) _referenceResolution.y;
+		public int width => _resolution.x;
+		public int height => _resolution.y;
+		public float aspect => _resolution.x / (float) _resolution.y;
 
 		/// <summary>
 		/// Returns false if the Json file failed to load.
@@ -120,14 +133,14 @@ namespace TrackingTools
 		/// </summary>
 		public Vector2 lensShiftNormalized =>
 			new Vector2(
-				(float) -( ( _cx / (double) _referenceResolution.x ) - 0.5 ),
-				(float) ( ( _cy / (double) _referenceResolution.y ) - 0.5 )
+				(float) -( ( _cx / (double) _resolution.x ) - 0.5 ),
+				(float) ( ( _cy / (double) _resolution.y ) - 0.5 )
 			);
 
 		/// <summary>
 		/// Vertical field of view (fov) angle in degrees as applied to Unity cameras.
 		/// </summary>
-		public float verticalFieldOfView => Mathf.Atan2( (float) _cy, _referenceResolution.y ) * 2f * Mathf.Rad2Deg;
+		public float verticalFieldOfView => Mathf.Atan2( (float) _cy, _resolution.y ) * 2f * Mathf.Rad2Deg;
 
 
 		static readonly string logPrepend = "<b>[" + nameof( Intrinsics ) + "]</b> ";
@@ -179,7 +192,7 @@ namespace TrackingTools
 				_distortionCoeffs = new double[ distCoeffsMat.total() ];
 			}
 
-			_referenceResolution = referenceResolution;
+			_resolution = referenceResolution;
 
 			UpdateFromOpenCVCameraIntrinsicsMatrix( cameraIntrinsicsMat );
 
@@ -191,7 +204,7 @@ namespace TrackingTools
 
 		public void UpdateFromOpenCV( Mat cameraIntrinsicsMat, Vector2Int referenceResolution, float rmsError )
 		{
-			_referenceResolution = referenceResolution;
+			_resolution = referenceResolution;
 
 			UpdateFromOpenCVCameraIntrinsicsMatrix( cameraIntrinsicsMat );
 
@@ -201,7 +214,7 @@ namespace TrackingTools
 
 		public void UpdateRaw( int resX, int resY, double cx, double cy, double fx, double fy, double[] distortionCoeffs = null )
 		{
-			_referenceResolution = new Vector2Int( resX, resY );
+			_resolution = new Vector2Int( resX, resY );
 
 			_cx = cx;
 			_cy = cy;
@@ -216,7 +229,7 @@ namespace TrackingTools
 
 		public void UpdateRaw( int resX, int resY, double cx, double cy, double fx, double fy, double k1, double k2, double k3, double p1, double p2 )
 		{
-			_referenceResolution = new Vector2Int( resX, resY );
+			_resolution = new Vector2Int( resX, resY );
 
 			_cx = cx;
 			_cy = cy;
@@ -231,7 +244,7 @@ namespace TrackingTools
 
 		public void UpdateRaw( int resX, int resY, double cx, double cy, double fx, double fy, double k1, double k2, double k3, double k4, double k5, double k6, double p1, double p2 )
 		{
-			_referenceResolution = new Vector2Int( resX, resY );
+			_resolution = new Vector2Int( resX, resY );
 
 			_cx = cx;
 			_cy = cy;
@@ -287,12 +300,12 @@ namespace TrackingTools
 
 			cam.gateFit = Camera.GateFitMode.None;
 
-			_referenceResolution = new Vector2Int( cam.pixelWidth, cam.pixelHeight );
+			_resolution = new Vector2Int( cam.pixelWidth, cam.pixelHeight );
 
-			_cx = ( -cam.lensShift.x + 0.5f ) * _referenceResolution.x;
-			_cy = (  cam.lensShift.y + 0.5f ) * _referenceResolution.y;
-			_fx = ( cam.focalLength / cam.sensorSize.x ) * _referenceResolution.x;
-			_fy = ( cam.focalLength / cam.sensorSize.y ) * _referenceResolution.y;
+			_cx = ( -cam.lensShift.x + 0.5f ) * _resolution.x;
+			_cy = (  cam.lensShift.y + 0.5f ) * _resolution.y;
+			_fx = ( cam.focalLength / cam.sensorSize.x ) * _resolution.x;
+			_fy = ( cam.focalLength / cam.sensorSize.y ) * _resolution.y;
 
 			_distortionCoeffs = new double[ defaultDistortionCoeffCount ]; // No distortion.
 
@@ -316,15 +329,14 @@ namespace TrackingTools
 			float focalLength = cam.focalLength;
 
 			cam.lensShift =  new Vector2(
-				(float) - ( ( _cx / (double) _referenceResolution.x ) - 0.5 ), 
-				(float)   ( ( _cy / (double) _referenceResolution.y ) - 0.5 )
+				(float) - ( ( _cx / (double) _resolution.x ) - 0.5 ), 
+				(float)   ( ( _cy / (double) _resolution.y ) - 0.5 )
 			);
 			cam.sensorSize = new Vector2(
-				(float) ( focalLength * _referenceResolution.x / _fx ),
-				(float) ( focalLength * _referenceResolution.y / _fy )
+				(float) ( focalLength * _resolution.x / _fx ),
+				(float) ( focalLength * _resolution.y / _fy )
 			);
 		}
-
 
 		void UpdateFromOpenCVCameraIntrinsicsMatrix( Mat cameraIntrinsicsMat )
 		{
