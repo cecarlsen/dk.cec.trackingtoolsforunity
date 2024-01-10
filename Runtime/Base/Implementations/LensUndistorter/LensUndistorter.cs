@@ -81,7 +81,7 @@ namespace TrackingTools
 			_UndistortKernel = _material.FindPass( nameof( _UndistortKernel ) );
 			_FLIP_Y = new LocalKeyword( shader, nameof( _FLIP_Y ) );
 
-			_undistortionMap = new RenderTexture( intrinsics.referenceResolution.x, intrinsics.referenceResolution.y, 0, RenderTextureFormat.RGFloat );
+			_undistortionMap = new RenderTexture( intrinsics.resolution.x, intrinsics.resolution.y, 0, RenderTextureFormat.RGFloat );
 			_undistortionMap.name = "LensDistortionMap";
 
 			Matrix4x4 camMatrix = new Matrix4x4(
@@ -93,8 +93,8 @@ namespace TrackingTools
 			camMatrix = camMatrix.inverse;
 
 			Constants c = new Constants();
-			c._W = intrinsics.referenceResolution.x;
-			c._H = intrinsics.referenceResolution.y;
+			c._W = intrinsics.resolution.x;
+			c._H = intrinsics.resolution.y;
 			c._CX = (float) intrinsics.cx;
 			c._CY = (float) intrinsics.cy;
 			c._FX = (float) intrinsics.fx;

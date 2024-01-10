@@ -1,5 +1,5 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2020-2022
+	Copyright © Carl Emil Carlsen 2020-2024
 	http://cec.dk
 */
 
@@ -11,7 +11,7 @@ namespace TrackingTools
 	public class CameraIntrinsicsLoader : MonoBehaviour
 	{
 		[SerializeField] string _intrinsicsFileName = "DefaultCamera";
-		[SerializeField] AutoLoadTime _loadTime = AutoLoadTime.Awake;
+		[SerializeField] AutoLoadTime _autoLoadTime = AutoLoadTime.Awake;
 
 		[System.Serializable] enum AutoLoadTime { Awake, OnEnable, Start, Off }
 
@@ -21,19 +21,19 @@ namespace TrackingTools
 
 		void Awake()
 		{
-			if( _loadTime == AutoLoadTime.Awake ) LoadAndApply();
+			if( _autoLoadTime == AutoLoadTime.Awake ) LoadAndApply();
 		}
 
 
 		void OnEnable()
 		{
-			if( _loadTime == AutoLoadTime.OnEnable ) LoadAndApply();
+			if( _autoLoadTime == AutoLoadTime.OnEnable ) LoadAndApply();
 		}
 
 
 		void Start()
 		{
-			if( _loadTime == AutoLoadTime.Start ) LoadAndApply();
+			if( _autoLoadTime == AutoLoadTime.Start ) LoadAndApply();
 		}
 
 

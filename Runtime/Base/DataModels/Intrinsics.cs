@@ -117,10 +117,21 @@ namespace TrackingTools
 		/// <summary>
 		/// Reference image pixel resolution. The values of cx, cy, fx, fy must be relative to this.
 		/// </summary>
-		public Vector2Int referenceResolution => _resolution;
+		public Vector2Int resolution => _resolution;
 
+		/// <summary>
+		/// Number of horizontal pixels.
+		/// </summary>
 		public int width => _resolution.x;
+
+		/// <summary>
+		/// Number of vertical pixels.
+		/// </summary>
 		public int height => _resolution.y;
+
+		/// <summary>
+		/// Aspect in terms of pixel count, disregarding pixel aspect.
+		/// </summary>
 		public float aspect => _resolution.x / (float) _resolution.y;
 
 		/// <summary>
@@ -143,11 +154,21 @@ namespace TrackingTools
 		public float verticalFieldOfView => Mathf.Atan2( (float) _cy, _resolution.y ) * 2f * Mathf.Rad2Deg;
 
 
+		/// <summary>
+		/// Horizontal field of view (fov) angle in degrees.
+		/// </summary>
+		public float horizontalFieldOfView => Mathf.Atan2( (float) _cx, _resolution.x ) * 2f * Mathf.Rad2Deg;
+
+
 		static readonly string logPrepend = "<b>[" + nameof( Intrinsics ) + "]</b> ";
-		
 
 
 
+		/// <summary>
+		/// Save intrinsic values to a json file at 'StreamingAssets/TrackingTools/Intrinsics/<fileName>.json'.
+		/// </summary>
+		/// <param name="fileName">Full file path</param>
+		/// <returns></returns>
 		public string SaveToFile( string fileName )
 		{
 			if( !Directory.Exists( TrackingToolsConstants.intrinsicsDirectoryPath ) ) Directory.CreateDirectory( TrackingToolsConstants.intrinsicsDirectoryPath );
@@ -158,6 +179,10 @@ namespace TrackingTools
 		}
 		
 
+		/// <summary>
+		/// Try load intrinsics file by name from 'StreamingAssets/TrackingTools/Intrinsics/<fileName>.json'.
+		/// </summary>
+		/// <returns>True if load succeded</returns>
 		public static bool TryLoadFromFile( string fileName, out Intrinsics intrinsics )
 		{
 			intrinsics = null;
@@ -186,13 +211,13 @@ namespace TrackingTools
 		}
 
 
-		public void UpdateFromOpenCV( Mat cameraIntrinsicsMat, MatOfDouble distCoeffsMat, Vector2Int referenceResolution, float rmsError )
+		public void UpdateFromOpenCV( Mat cameraIntrinsicsMat, MatOfDouble distCoeffsMat, Vector2Int resolution, float rmsError )
 		{
 			if( _distortionCoeffs == null || distCoeffsMat.IsDisposed || _distortionCoeffs.Length != distCoeffsMat.total() ){
 				_distortionCoeffs = new double[ distCoeffsMat.total() ];
 			}
 
-			_resolution = referenceResolution;
+			_resolution = resolution;
 
 			UpdateFromOpenCVCameraIntrinsicsMatrix( cameraIntrinsicsMat );
 
@@ -202,9 +227,9 @@ namespace TrackingTools
 		}
 
 
-		public void UpdateFromOpenCV( Mat cameraIntrinsicsMat, Vector2Int referenceResolution, float rmsError )
+		public void UpdateFromOpenCV( Mat cameraIntrinsicsMat, Vector2Int resolution, float rmsError )
 		{
-			_resolution = referenceResolution;
+			_resolution = resolution;
 
 			UpdateFromOpenCVCameraIntrinsicsMatrix( cameraIntrinsicsMat );
 
@@ -286,6 +311,9 @@ namespace TrackingTools
 		}
 
 
+		/// <summary>
+		/// Update intrinsic values from a Unity camera.
+		/// </summary>
 		public void UpdateFromUnityCamera( Camera cam )
 		{
 			if( cam.orthographic ){
@@ -338,6 +366,10 @@ namespace TrackingTools
 			);
 		}
 
+
+
+
+
 		void UpdateFromOpenCVCameraIntrinsicsMatrix( Mat cameraIntrinsicsMat )
 		{
 			_fx = cameraIntrinsicsMat.ReadValue( 0, 0 );
@@ -362,6 +394,48 @@ namespace TrackingTools
 			string text =  "(cx,cy,fx,fy): ( " + _cx + ", " + _cy + ", " + _fx + ", " + _fy + " )";
 			text += " dist: ( " + string.Join( ',', _distortionCoeffs ) + " ).";
 			return text;
+		}
+
+
+		/// <summary>
+		/// Compute projection matrix as defined by a Unity camera with 'physicalCamera' enabled.
+		/// </summary>
+		public static Matrix4x4 ComputeUnityPhysicalCameraProjectionMatrix
+		(
+			float focalLength, Vector2 sensorSize, Vector2 shift, float near, float far
+		){
+			// Helpful resource:
+			// https://en.wikibooks.org/wiki/Cg_Programming/Unity/Projection_for_Virtual_Reality
+
+			// TODO: GateFit modes.
+
+			float factor = near / focalLength;
+			float l = sensorSize.x * ( 0.5f + shift.x ) * factor;   // Focal center to sensor left edge.
+			float r = -sensorSize.x * ( 0.5f - shift.x ) * factor;  // Focal center to sensor right edge.
+			float b = sensorSize.y * ( 0.5f + shift.y ) * factor;   // Focal center to sensor bottom edge.
+			float t = -sensorSize.y * ( 0.5f - shift.y ) * factor;  // Focal center to sensor top edge.
+
+			return new Matrix4x4() {
+				m00 = 2f * near / ( r - l ),
+				//m01 = 0f,
+				m02 = ( r + l ) / ( r - l ),
+				//m03 = 0f,
+
+				//m10 = 0f,
+				m11 = 2f * near / ( t - b ),
+				m12 = ( t + b ) / ( t - b ),
+				//m13 = 0f,
+
+				//m20 = 0f,
+				//m21 = 0f,
+				m22 = ( far + near ) / ( near - far ),
+				m23 = 2f * far * near / ( near - far ),
+
+				//m30 = 0f,
+				//m31 = 0f,
+				m32 = -1,
+				//m33 = 0f,
+			};
 		}
 	}
 }

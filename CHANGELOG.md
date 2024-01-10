@@ -1,15 +1,23 @@
+## 0.1.5  (2024/01/10)
+
+- Added static method Intrinsics.ComputeUnityPhysicalCameraProjectionMatrix.
+
+
 ## 0.1.4  (2024/01/04)
 
 - Added CameraToCameraFromCheckerboardExtrinsicsEstimator for stereo calibration.
+
 
 ## 0.1.3  (2024/01/02)
 
 - CameraFromCheckerboardExtrinsicsEstimator support for linear lenses.
 
+
 ## 0.1.2  (2023/09/29)
 
 - Added LensUndistorter, a GPU alternative to OpenCV's Calib3d.undistort, or combined Calib3d.initUndistortRectifyMap and Imgproc.remap.
 - Renamed CameraFromCircleAnchorExtrinsicsEstimator to CameraFromWorldPointsExtrinsicsEstimator and updated it to accept any set of 3D points, as defined by Transforms.
+
 
 ## 0.1.1  (2023/02/01)
 

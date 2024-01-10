@@ -14,14 +14,21 @@ namespace TrackingTools
 		[SerializeField] AutoLoadTime _loadTime = AutoLoadTime.Awake;
 
 		[Header("Output")]
-		[SerializeField] UnityEvent<Vector2> _lensShiftNormalized = new UnityEvent<Vector2>();
-		[SerializeField] UnityEvent<float> _verticalFieldOfView = new UnityEvent<float>();
+		[SerializeField,Tooltip("Lens shift as defined in Unity camera with 'physicalCamera' enabled.")] UnityEvent<Vector2> _lensShift = new UnityEvent<Vector2>();
+		[SerializeField,Tooltip("Degrees")] UnityEvent<float> _verticalFieldOfView = new UnityEvent<float>();
+
+		[Header("Debug")]
+		[SerializeField] bool _displayFrustumGizmo = false;
+		[SerializeField] float _frustumGizmoNear = 0.1f;
+		[SerializeField] float _frustumGizmoFar = 5f;
 
 		[System.Serializable] enum AutoLoadTime { Awake, OnEnable, Start, Off }
 
 		Intrinsics _intrinsics;
 
 		static string logPrepend = "<b>[" + nameof( IntrinsicsLoader ) + "]</b> ";
+
+		public Intrinsics intrinsics => _intrinsics;
 
 
 		void Awake()
@@ -49,8 +56,14 @@ namespace TrackingTools
 				return;
 			}
 
-			_lensShiftNormalized.Invoke( _intrinsics.lensShiftNormalized );
+			_lensShift.Invoke( _intrinsics.lensShiftNormalized );
 			_verticalFieldOfView.Invoke( _intrinsics.verticalFieldOfView );
+		}
+
+
+		public void OnDrawGizmos()
+		{
+			
 		}
 	}
 }
