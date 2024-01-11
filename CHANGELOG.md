@@ -1,6 +1,13 @@
+
+## 0.1.6 (2024/01/11)
+
+- Added ToProjetionMatrix(), GetDerivedSensorSize(), and GetDerivedFocalLength() to Intrinsics.
+- Extended IntrinsicsLoader.
+
+
 ## 0.1.5  (2024/01/10)
 
-- Added static method Intrinsics.ComputeUnityPhysicalCameraProjectionMatrix.
+- Added static method Intrinsics.ComputeUnityPhysicalCameraProjectionMatrix().
 
 
 ## 0.1.4  (2024/01/04)

@@ -1,5 +1,5 @@
 /*
-	Copyright © Carl Emil Carlsen 2022
+	Copyright © Carl Emil Carlsen 2022-2024
 	http://cec.dk
 */
 
@@ -13,8 +13,9 @@ namespace TrackingTools
 		[SerializeField] string _intrinsicsFileName = "DefaultCamera";
 		[SerializeField] bool _saveOnDestroy = true;
 		[SerializeField] bool _saveOnDisable = false;
+		[SerializeField] bool _logActions = true;
 
-		//static string logPrepend = "<b>[" + nameof( CameraIntrinsicsLoader) + "]</b> ";
+		static string logPrepend = "<b>[" + nameof( CameraIntrinsicsSaver ) + "]</b> ";
 
 
 		void OnDisable()
@@ -34,9 +35,9 @@ namespace TrackingTools
 
 			Intrinsics intrinsics = new Intrinsics();
 			intrinsics.UpdateFromUnityCamera( cam );
-			intrinsics.SaveToFile( _intrinsicsFileName );
+			string filePath = intrinsics.SaveToFile( _intrinsicsFileName );
 
-			//Debug.Log( intrinsics );
+			if( _logActions ) Debug.Log( logPrepend + "Saved intrinsics to file at '" + filePath + "'.\n" );
 		}
 	}
 }

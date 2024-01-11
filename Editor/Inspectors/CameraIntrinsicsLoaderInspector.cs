@@ -1,5 +1,5 @@
 /*
-	Copyright © Carl Emil Carlsen 2022
+	Copyright © Carl Emil Carlsen 2022-2024
 	http://cec.dk
 */
 
@@ -28,7 +28,7 @@ namespace TrackingTools
 
 			EditorGUILayout.Space();
 
-			if( GUILayout.Button( "Load" ) ) _component.LoadAndApply();
+			if( GUILayout.Button( "Load!" ) ) _component.LoadAndApply();
 
 			serializedObject.ApplyModifiedProperties();
 		}

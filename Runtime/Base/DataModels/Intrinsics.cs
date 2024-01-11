@@ -140,9 +140,9 @@ namespace TrackingTools
 		public bool isValid => _distortionCoeffs != null; // If json deserialization failed _distortionCoeffs will be null.
 		
 		/// <summary>
-		/// Lens shift value, as applied to Unity cameras.
+		/// Lens shift value as applied to Unity cameras.
 		/// </summary>
-		public Vector2 lensShiftNormalized =>
+		public Vector2 lensShift =>
 			new Vector2(
 				(float) -( ( _cx / (double) _resolution.x ) - 0.5 ),
 				(float) ( ( _cy / (double) _resolution.y ) - 0.5 )
@@ -151,17 +151,41 @@ namespace TrackingTools
 		/// <summary>
 		/// Vertical field of view (fov) angle in degrees as applied to Unity cameras.
 		/// </summary>
-		public float verticalFieldOfView => Mathf.Atan2( (float) _cy, _resolution.y ) * 2f * Mathf.Rad2Deg;
+		public float verticalFieldOfView => 2 * Mathf.Atan2( _resolution.y, (float) ( 2f * _fy ) ) * Mathf.Rad2Deg; // https://stackoverflow.com/a/41137160
 
 
 		/// <summary>
 		/// Horizontal field of view (fov) angle in degrees.
 		/// </summary>
-		public float horizontalFieldOfView => Mathf.Atan2( (float) _cx, _resolution.x ) * 2f * Mathf.Rad2Deg;
+		public float horizontalFieldOfView => 2 * Mathf.Atan2( _resolution.x, (float) ( 2f * _fx ) ) * Mathf.Rad2Deg; // https://stackoverflow.com/a/41137160
 
 
 		static readonly string logPrepend = "<b>[" + nameof( Intrinsics ) + "]</b> ";
 
+
+		/// <summary>
+		/// Given a known (or made up) focal length, compute the sensor size.
+		/// OpenCV intrinsics neither knows the sensor size or the focal length, but knowing one we can derive the other.
+		/// </summary>
+		public Vector2 GetDerivedSensorSize( float focalLength )
+		{
+			// Given that fx = F * sx.
+			return new Vector2(
+				(float) ( focalLength * _resolution.x / _fx ),
+				(float) ( focalLength * _resolution.y / _fy )
+			);
+		}
+
+
+		/// <summary>
+		/// Given a known (or made up) sensor size, compute the focal length.
+		/// OpenCV intrinsics neither knows the sensor size or the focal length, but knowing one we can derive the other.
+		/// </summary>
+		public float GetDerivedFocalLength( Vector2 sensorSize )
+		{
+			// Given that fx = F * sx.
+			return (float) ( _fx / ( sensorSize.x / (float) _resolution.x ) );
+		}
 
 
 		/// <summary>
@@ -341,6 +365,10 @@ namespace TrackingTools
 		}
 
 
+		/// <summary>
+		/// Apply intrinsic values to a unity camera.
+		/// </summary>
+		/// <param name="cam"></param>
 		public void ApplyToUnityCamera( Camera cam )
 		{
 			// Great explanation by jungguswns:
@@ -352,21 +380,15 @@ namespace TrackingTools
 			cam.orthographic = false;
 			cam.usePhysicalProperties = true;
 			cam.gateFit = Camera.GateFitMode.None;
-
-			// Keep the current focal length. F can be arbitrary, as long as sensor size is resized to to make fx and fy consistient
-			float focalLength = cam.focalLength;
-
-			cam.lensShift =  new Vector2(
-				(float) - ( ( _cx / (double) _resolution.x ) - 0.5 ), 
-				(float)   ( ( _cy / (double) _resolution.y ) - 0.5 )
-			);
-			cam.sensorSize = new Vector2(
-				(float) ( focalLength * _resolution.x / _fx ),
-				(float) ( focalLength * _resolution.y / _fy )
-			);
+			cam.lensShift = lensShift;
+			cam.sensorSize = GetDerivedSensorSize( cam.focalLength ); // Just use the cameras current focal length to derive the sensor size.
 		}
 
 
+		/// <summary>
+		/// Get a projection matrix representation of the intrinsics. (Without distortion obviously).
+		/// </summary>
+		public Matrix4x4 ToProjetionMatrix( float near, float far ) => ComputeUnityPhysicalCameraProjectionMatrix( _cx, _cy, _fx, _fy, _resolution, near, far );
 
 
 
@@ -397,12 +419,37 @@ namespace TrackingTools
 		}
 
 
+		
+		/// <summary>
+		/// Compute projection matrix from OpenCV intrinsic values to match values as defined by a Unity camera with 'physicalCamera' enabled.
+		/// </summary>
+		public static Matrix4x4 ComputeUnityPhysicalCameraProjectionMatrix
+		(
+			double cx, double cy, double fx, double fy, Vector2 resolution, float near, float far
+		){
+			// Pick a constant focal length. We adjust sensor size to match the field of view.
+			const float focalLength = 100f;
+
+			Vector2 shift = new Vector2(
+				(float) -( ( cx / (double) resolution.x ) - 0.5 ),
+				(float) ( ( cy / (double) resolution.y ) - 0.5 )
+			);
+			Vector2 sensorSize = new Vector2(
+				(float) ( focalLength * resolution.x / fx ),
+				(float) ( focalLength * resolution.y / fy )
+			);
+
+			return ComputeUnityPhysicalCameraProjectionMatrix( focalLength, sensorSize, shift, near, far );
+		}
+		
+
+
 		/// <summary>
 		/// Compute projection matrix as defined by a Unity camera with 'physicalCamera' enabled.
 		/// </summary>
 		public static Matrix4x4 ComputeUnityPhysicalCameraProjectionMatrix
 		(
-			float focalLength, Vector2 sensorSize, Vector2 shift, float near, float far
+			float focalLength, Vector2 sensorSize, Vector2 lensShift, float near, float far
 		){
 			// Helpful resource:
 			// https://en.wikibooks.org/wiki/Cg_Programming/Unity/Projection_for_Virtual_Reality
@@ -410,20 +457,20 @@ namespace TrackingTools
 			// TODO: GateFit modes.
 
 			float factor = near / focalLength;
-			float l = sensorSize.x * ( 0.5f + shift.x ) * factor;   // Focal center to sensor left edge.
-			float r = -sensorSize.x * ( 0.5f - shift.x ) * factor;  // Focal center to sensor right edge.
-			float b = sensorSize.y * ( 0.5f + shift.y ) * factor;   // Focal center to sensor bottom edge.
-			float t = -sensorSize.y * ( 0.5f - shift.y ) * factor;  // Focal center to sensor top edge.
+			float l = sensorSize.x * ( 0.5f + lensShift.x ) * factor;   // Focal center to sensor left edge.
+			float r = -sensorSize.x * ( 0.5f - lensShift.x ) * factor;  // Focal center to sensor right edge.
+			float b = sensorSize.y * ( 0.5f + lensShift.y ) * factor;   // Focal center to sensor bottom edge.
+			float t = -sensorSize.y * ( 0.5f - lensShift.y ) * factor;  // Focal center to sensor top edge.
 
 			return new Matrix4x4() {
-				m00 = 2f * near / ( r - l ),
+				m00 = -2f * near / ( r - l ),
 				//m01 = 0f,
-				m02 = ( r + l ) / ( r - l ),
+				m02 = -( r + l ) / ( r - l ),
 				//m03 = 0f,
 
 				//m10 = 0f,
-				m11 = 2f * near / ( t - b ),
-				m12 = ( t + b ) / ( t - b ),
+				m11 = -2f * near / ( t - b ),
+				m12 = -( t + b ) / ( t - b ),
 				//m13 = 0f,
 
 				//m20 = 0f,

@@ -12,6 +12,7 @@ namespace TrackingTools
 	{
 		[SerializeField] string _intrinsicsFileName = "DefaultCamera";
 		[SerializeField] AutoLoadTime _autoLoadTime = AutoLoadTime.Awake;
+		[SerializeField] bool _logActions = true;
 
 		[System.Serializable] enum AutoLoadTime { Awake, OnEnable, Start, Off }
 
@@ -48,7 +49,7 @@ namespace TrackingTools
 			Camera cam = GetComponent<Camera>();
 			intrinsics.ApplyToUnityCamera( cam );
 
-			//Debug.Log( intrinsics );
+			if( _logActions ) Debug.Log( logPrepend + "Loaded intrinsics from file at '" + TrackingToolsHelper.GetIntrinsicsFilePath( _intrinsicsFileName ) + "'.\n" );
 		}
 	}
 }
