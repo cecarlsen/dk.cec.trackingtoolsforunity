@@ -462,7 +462,8 @@ namespace TrackingTools
 			float b = sensorSize.y * ( 0.5f + lensShift.y ) * factor;   // Focal center to sensor bottom edge.
 			float t = -sensorSize.y * ( 0.5f - lensShift.y ) * factor;  // Focal center to sensor top edge.
 
-			return new Matrix4x4() {
+			return new Matrix4x4()
+			{
 				m00 = -2f * near / ( r - l ),
 				//m01 = 0f,
 				m02 = -( r + l ) / ( r - l ),
