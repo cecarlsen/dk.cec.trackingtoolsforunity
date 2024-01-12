@@ -17,7 +17,7 @@ namespace TrackingTools
 
 		[Header("Output")]
 		[SerializeField,Tooltip("Just forwarding the focal length as defined above." )] UnityEvent<float> _focalLengthEvent = new UnityEvent<float>();
-		[SerializeField,Tooltip("Sensor size as defined in Unity camera with 'physicalCamera' enabled.")] UnityEvent<Vector2> _sensorSizeEvent = new UnityEvent<Vector2>();
+		[SerializeField,Tooltip("Sensor size as defined in Unity camera with 'physicalCamera' enabled.")] UnityEvent<Vector2> _derivedSensorSizeEvent = new UnityEvent<Vector2>();
 		[SerializeField,Tooltip("Lens shift as defined in Unity camera with 'physicalCamera' enabled.")] UnityEvent<Vector2> _lensShiftEvent = new UnityEvent<Vector2>();
 		[SerializeField,Tooltip("Degrees")] UnityEvent<float> _verticalFieldOfViewEvent = new UnityEvent<float>();
 		[SerializeField,Tooltip("Degrees")] UnityEvent<float> _horizontalFieldOfViewEvent = new UnityEvent<float>();
@@ -65,7 +65,7 @@ namespace TrackingTools
 			if( _logActions ) Debug.Log( logPrepend + "Loaded intrinsics from file at '" + TrackingToolsHelper.GetIntrinsicsFilePath( _intrinsicsFileName ) + "'.\n" );
 
 			_focalLengthEvent.Invoke( _focalLength );
-			_sensorSizeEvent.Invoke( _intrinsics.GetDerivedSensorSize( _focalLength ) );
+			_derivedSensorSizeEvent.Invoke( _intrinsics.GetDerivedSensorSize( _focalLength ) );
 			_lensShiftEvent.Invoke( _intrinsics.lensShift );
 			_verticalFieldOfViewEvent.Invoke( _intrinsics.verticalFieldOfView );
 			_horizontalFieldOfViewEvent.Invoke( _intrinsics.horizontalFieldOfView );
