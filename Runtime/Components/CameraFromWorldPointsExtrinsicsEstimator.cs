@@ -45,7 +45,7 @@ namespace TrackingTools
 		//[Header("Other")]
 		//[SerializeField] bool _undistortOnGpu = true;
 
-		ExtrinsicsCalibrator _calibrator;
+		ExtrinsicsCalibrator _extrinsicsCalibrator;
 		Intrinsics _intrinsics;
 		Flipper _flipper;
 		LensUndistorter _lensUndistorter;
@@ -153,7 +153,7 @@ namespace TrackingTools
 
 			int pointCount = _worldPointTransforms.Length;
 
-			_calibrator = new ExtrinsicsCalibrator();
+			_extrinsicsCalibrator = new ExtrinsicsCalibrator();
 
 			// Create UI.
 			if( !_containerUI ) {
@@ -163,7 +163,6 @@ namespace TrackingTools
 			_physicalCameraImageUI = new GameObject( "PhysicalCameraImage" ).AddComponent<RawImage>();
 			_physicalCameraImageUI.transform.SetParent( _containerUI.transform );
 			_physicalCameraImageUI.rectTransform.FitParent();
-			//_physicalCameraImageUI
 			_physicalCameraImageRect = _physicalCameraImageUI.GetComponent<RectTransform>();
 			_virtualCameraImageUI = new GameObject( "VirtualCameraImage" ).AddComponent<RawImage>();
 			_virtualCameraImageUI.transform.SetParent( _containerUI.transform );
@@ -180,7 +179,6 @@ namespace TrackingTools
 			for( int p = 0; p < pointCount; p++ )
 			{
 				GameObject pointObject = new GameObject( "Point" + p );
-				//pointObject.transform.SetParent( _physicalCameraImageRect );
 				pointObject.transform.SetParent( _containerUI );
 				Image pointImage = pointObject.AddComponent<Image>();
 				pointImage.color = Color.cyan;
@@ -239,7 +237,7 @@ namespace TrackingTools
 		void OnDestroy()
 		{
 			_virtualCameraRenderTexture?.Release();
-			_calibrator?.Release();
+			_extrinsicsCalibrator?.Release();
 			_lensUndistorter?.Release();
 			_processedPhysicalCameraTexture?.Release();
 			_calibrationPointsImageMat?.Dispose();
@@ -464,19 +462,17 @@ namespace TrackingTools
 			{
 				Vector2 posImage = _userPointRects[ p ].anchorMin;
 				posImage.y = 1f - posImage.y; // OpenCv pixels are flipped vertically.
-				//posImage.Scale( new Vector2( _physicalCameraTexture.width, _physicalCameraTexture.height ) );
 				posImage.Scale( new Vector2( _intrinsics.width, _intrinsics.height ) );
 				_calibrationPointsImage[ p ].set( new double[]{ posImage.x, posImage.y } );
-				//Vector3 posWorld = _anchorTransform.TransformPoint( defaultPointPositions[p] - Vector2.one * 0.5f );
 				Vector3 posWorld = _worldPointTransforms[ p ].position;
 				_calibrationPointsWorld[ p ].set( new double[]{ posWorld.x, posWorld.y, posWorld.z } );
 			}
 			_calibrationPointsImageMat.fromArray( _calibrationPointsImage );
 			_calibrationPointsWorldMat.fromArray( _calibrationPointsWorld ); 
 			
-			_calibrator.UpdateExtrinsics( _calibrationPointsWorldMat, _calibrationPointsImageMat, _intrinsics );
+			_extrinsicsCalibrator.UpdateExtrinsics( _calibrationPointsWorldMat, _calibrationPointsImageMat, _intrinsics );
 			
-			_calibrator.extrinsics.ApplyToTransform( _virtualCamera.transform );
+			_extrinsicsCalibrator.extrinsics.ApplyToTransform( _virtualCamera.transform );
 
 			// Save.
 			SaveCircleAnchorPoints();

@@ -182,7 +182,7 @@ namespace TrackingTools
 
 			// Find chessboard.
 			Mat chessboardSourceMat = _state == State.Calibrating ? _camTexGrayMat : _camTexGrayUndistortMat;
-			bool foundBoard = TrackingToolsHelper.FindChessboardCorners( chessboardSourceMat, _checkerboard.checkerPatternSize, ref _chessCornersImageMat, fastAndImprecise: true, _checkerboard.hasMaker );
+			bool foundBoard = TrackingToolsHelper.FindChessboardCorners( chessboardSourceMat, _checkerboard.checkerPatternSize, ref _chessCornersImageMat, fastAndImprecise: true, _checkerboard.hasMarker );
 
 			// State dependent updates.
 			switch( _state )
@@ -228,7 +228,7 @@ namespace TrackingTools
 			if( _stableFrameCount == stableFrameCountThreshold )
 			{
 				// Find the calibration board again, this time with higher precision.
-				foundBoard = TrackingToolsHelper.FindChessboardCorners( _camTexGrayMat, _checkerboard.checkerPatternSize, ref _chessCornersImageMat, fastAndImprecise: false, _checkerboard.hasMaker );
+				foundBoard = TrackingToolsHelper.FindChessboardCorners( _camTexGrayMat, _checkerboard.checkerPatternSize, ref _chessCornersImageMat, fastAndImprecise: false, _checkerboard.hasMarker );
 				if( !foundBoard ) {
 					// Abort.
 					_successFrameCount = 0;

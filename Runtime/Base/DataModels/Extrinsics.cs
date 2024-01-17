@@ -15,8 +15,8 @@ namespace TrackingTools
 	[System.Serializable]
 	public class Extrinsics
 	{
-		[SerializeField] Quaternion rotation;
 		[SerializeField] Vector3 translation;
+		[SerializeField] Quaternion rotation;
 
 		static readonly string logPrepend = "<b>[" + nameof( Extrinsics ) + "]</b> ";
 
@@ -114,7 +114,7 @@ namespace TrackingTools
 
 		public override string ToString()
 		{
-			return "t, r: " + translation + ", " + rotation;
+			return "translation: " + translation + ", rotation: " + rotation;
 		}
 	}
 }

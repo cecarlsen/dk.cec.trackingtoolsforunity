@@ -456,6 +456,7 @@ MonoBehaviour:
   _defaultExtrinsicsFileName: CameraAToCameraBExtrinsics
   _processedCameraImageA: {fileID: 1516999709}
   _processedCameraImageB: {fileID: 759242285}
+  _actionButton: {fileID: 1211323795}
 --- !u!4 &542099836
 Transform:
   m_ObjectHideFlags: 0

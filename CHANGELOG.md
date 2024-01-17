@@ -1,3 +1,7 @@
+## 0.1.7 (2024/01/17)
+
+- Fixed issue with CameraToCameraFromCheckerboardExtrinsicsEstimator.
+
 
 ## 0.1.6 (2024/01/11)
 

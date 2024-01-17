@@ -10,6 +10,7 @@ using OpenCVForUnity.UnityUtils;
 using OpenCVForUnity.CoreModule;
 using OpenCVForUnity.Calib3dModule;
 using OpenCVForUnity.ImgprocModule;
+using System;
 
 
 namespace TrackingTools
@@ -24,9 +25,10 @@ namespace TrackingTools
 		[SerializeField] bool _flipSourceTextureVertically = false;
 		[SerializeField] string _intrinsicsFileName = "DefaultCamera";
 		[SerializeField] Checkerboard _calibrationBoard = null;
+		[SerializeField,Range(0f,50f),Tooltip("16 bit textures value are multiplied by this factor before they are converted to 8-bit. Optional normalization happens after.")] float _conversionFactorFor16BitTextures = 1f;
 		[SerializeField,Tooltip("Only use when you cannot control lighting conditions.")] bool _normalizeSourceTexture = false;
 
-		[Header("Options")]
+		[ Header("Options")]
 		[SerializeField,Tooltip("Transform the calibration board instead of the camera.")] bool _tranformCalibrationBoard = false;
 		[SerializeField] bool _fastAndImprecise = false;
 
@@ -168,7 +170,7 @@ namespace TrackingTools
 			TrackingToolsHelper.TextureToMat( _cameraSourceTexture, !_flipSourceTextureVertically, ref _camTexMat, ref _tempTransferColors, ref _tempTransferTexture );
 
 			// Convert to grayscale if more than one channel, else copy (and convert bit rate if necessary).
-			TrackingToolsHelper.ColorMatToLumanceMat( _camTexMat, _camTexGrayMat );
+			TrackingToolsHelper.ColorMatToLumanceMat( _camTexMat, _camTexGrayMat, _conversionFactorFor16BitTextures );
 
 			// Sometimes normalization makes it easier for FindChessboardCorners.
 			if( _normalizeSourceTexture ) Core.normalize( _camTexGrayMat, _camTexGrayMat, 0, 255, Core.NORM_MINMAX, CvType.CV_8U );

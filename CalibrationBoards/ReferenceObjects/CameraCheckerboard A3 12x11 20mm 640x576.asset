@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 06b02822ad09eea47b388408b64c5301, type: 3}
-  m_Name: CameraCheckerboard A4 1920x1080
+  m_Name: CameraCheckerboard A3 12x11 20mm 640x576
   m_EditorClassIdentifier: 
-  checkerPatternSize: {x: 33, y: 20}
-  checkerTileSize: 8
+  checkerPatternSize: {x: 12, y: 11}
+  checkerTileSize: 20

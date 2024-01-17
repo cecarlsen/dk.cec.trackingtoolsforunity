@@ -25,21 +25,23 @@ namespace TrackingTools
 		[SerializeField] Camera _targetCameraB = null;
 
 		[Header("Input")]
-		[SerializeField] Texture _cameraSourceTextureA = null;
-		[SerializeField] Texture _cameraSourceTextureB = null;
+		[SerializeField,Tooltip("Expects lens distorted texture")] Texture _cameraSourceTextureA = null;
+		[SerializeField,Tooltip("Expects lens distorted texture")] Texture _cameraSourceTextureB = null;
 		[SerializeField] bool _flipSourceTextureAVertically = false;
 		[SerializeField] bool _flipSourceTextureBVertically = false;
 		[SerializeField] string _intrinsicsAFileName = "DefaultCameraA";
 		[SerializeField] string _intrinsicsBFileName = "DefaultCameraB";
 		[SerializeField] Checkerboard _checkerboard = null;
+		[SerializeField,Range(0f,50f),Tooltip("16 bit textures value are multiplied by this factor before they are converted to 8-bit. Optional normalization happens after.")] float _conversionFactorFor16BitTextureA = 1f;
+		[SerializeField,Range(0f,50f),Tooltip("16 bit textures value are multiplied by this factor before they are converted to 8-bit. Optional normalization happens after.")] float _conversionFactorFor16BitTextureB = 1f;
 		[SerializeField,Tooltip("Only use when you cannot control lighting conditions.")] bool _normalizeSourceATexture = false;
 		[SerializeField,Tooltip("Only use when you cannot control lighting conditions.")] bool _normalizeSourceBTexture = false;
 
-		[Header("Options")]
-		[SerializeField] bool _fastAndImprecise = false;
+		//[Header("Options")]
+		//[SerializeField] bool _fastAndImprecise = false; // Not currently worknig.
 
 		[Header("Output")]
-		[SerializeField,Tooltip("Name used when SaveToFile is called and no file name is provided.")] string _defaultExtrinsicsFileName = "DefaultCameraFromChessboard";
+		[SerializeField,Tooltip("Name used when SaveToFile is called and no file name is provided.")] string _extrinsicsFileName = "DefaultCameraFromChessboard";
 
 		[Header("UI")]
 		[SerializeField] RawImage _processedCameraImageA = null;
@@ -47,6 +49,7 @@ namespace TrackingTools
 		[SerializeField] Button _actionButton = null;
 
 
+		StereoExtrinsicsCalibrator _stereoExtrinsicsCalibrator;
 		Intrinsics _intrinsicsA, _intrinsicsB;
 		ExtrinsicsCalibrator _extrinsicsCalibratorA, _extrinsicsCalibratorB;
 
@@ -88,6 +91,8 @@ namespace TrackingTools
 		bool _foundBoardA, _foundBoardB;
 		bool _initiated;
 
+		State _state = State.Sampling;
+
 		const int targetSampleCount = 4;
 		const string logPrepend = "<b>[" + nameof( CameraToCameraFromCheckerboardExtrinsicsEstimator ) + "]</b> ";
 
@@ -107,6 +112,9 @@ namespace TrackingTools
 				_dirtyCameraTextureB = true;
 			}
 		}
+
+
+		enum State { Sampling, Testing }
 
 
 		void Awake()
@@ -142,6 +150,7 @@ namespace TrackingTools
 			_chessCornersImageSamplesMatA = new List<Mat>();
 			_chessCornersImageSamplesMatB = new List<Mat>();
 
+			_stereoExtrinsicsCalibrator = new StereoExtrinsicsCalibrator();
 			_extrinsicsCalibratorA = new ExtrinsicsCalibrator();
 			_extrinsicsCalibratorB = new ExtrinsicsCalibrator();
 
@@ -164,7 +173,7 @@ namespace TrackingTools
 			meshRenderer.sharedMaterial = calibrationBoardMaterial;
 
 			_actionButton.GetComponentInChildren<Text>().text = "Sample";
-			_actionButton.onClick.AddListener( () => Sample() );
+			_actionButton.onClick.AddListener( () => OnAction() );
 
 			// Update world points.
 			TrackingToolsHelper.UpdateWorldSpacePatternPoints( _checkerboard.checkerPatternSize, _targetCheckerboardTransform.localToWorldMatrix, TrackingToolsHelper.PatternType.Checkerboard, Vector2.zero, ref _chessCornersWorldMat );
@@ -201,6 +210,7 @@ namespace TrackingTools
 			_camTexMatB?.release();
 			_arTextureA?.Release();
 			_arTextureB?.Release();
+			_stereoExtrinsicsCalibrator?.Release();
 			_extrinsicsCalibratorA?.Release();
 			_extrinsicsCalibratorB?.Release();
 			_rotation3x3Mat?.release() ;
@@ -226,8 +236,8 @@ namespace TrackingTools
 				) ) return;
 
 				UpdatePreviewForCamera(
-					_cameraSourceTextureA, _intrinsicsA, _flipSourceTextureAVertically, _normalizeSourceATexture, _targetCameraA, _arImageA, _processedCameraTextureA, ref _foundBoardA,
-					ref _tempTransferColorsA, _tempTransferTextureA, ref _camTexMatA, ref _chessCornersImageMatA, _camTexGrayMatA, _camTexGrayUndistortMatA, _undistortMapA1, _undistortMapA2, _extrinsicsCalibratorA
+					_cameraSourceTextureA, _intrinsicsA, _flipSourceTextureAVertically, _conversionFactorFor16BitTextureA, _normalizeSourceATexture, _targetCameraA, _arImageA, _processedCameraTextureA, ref _foundBoardA,
+					ref _tempTransferColorsA, _tempTransferTextureA, ref _camTexMatA, ref _chessCornersImageMatA, _camTexGrayMatA, _camTexGrayUndistortMatA, _undistortMapA1, _undistortMapA2, _extrinsicsCalibratorA, findAndApplyExtrinsics: true
 				);
 
 				_dirtyCameraTextureA = false;
@@ -239,9 +249,10 @@ namespace TrackingTools
 					ref _processedCameraTextureB, ref _sensorMatB, ref _distortionCoeffsMatB, ref _camTexGrayMatB, ref _camTexGrayUndistortMatB, ref _arTextureB
 				) ) return;
 
+				bool findAndApplyExtrinsics = _state != State.Testing;
 				UpdatePreviewForCamera(
-					_cameraSourceTextureB, _intrinsicsB, _flipSourceTextureBVertically, _normalizeSourceBTexture, _targetCameraB, _arImageB, _processedCameraTextureB, ref _foundBoardB,
-					ref _tempTransferColorsB, _tempTransferTextureB, ref _camTexMatB, ref _chessCornersImageMatB, _camTexGrayMatB, _camTexGrayUndistortMatB, _undistortMapB1, _undistortMapB2, _extrinsicsCalibratorB
+					_cameraSourceTextureB, _intrinsicsB, _flipSourceTextureBVertically, _conversionFactorFor16BitTextureB, _normalizeSourceBTexture, _targetCameraB, _arImageB, _processedCameraTextureB, ref _foundBoardB,
+					ref _tempTransferColorsB, _tempTransferTextureB, ref _camTexMatB, ref _chessCornersImageMatB, _camTexGrayMatB, _camTexGrayUndistortMatB, _undistortMapB1, _undistortMapB2, _extrinsicsCalibratorB, findAndApplyExtrinsics
 				);
 
 				_dirtyCameraTextureB = false;
@@ -249,19 +260,23 @@ namespace TrackingTools
 
 			bool buttonVisible = _chessCornersWorldSamplesMat.Count == targetSampleCount || ( _foundBoardA && _foundBoardB );
 			if( buttonVisible != _actionButton.gameObject.activeSelf ) _actionButton.gameObject.SetActive( buttonVisible );
+
+			//if( _state == State.Testing ) {
+			//	_resultExtrinsics.ApplyToTransform( _targetCameraB.transform, _targetCameraA.transform );
+			//}
 		}
 
 
 		void UpdatePreviewForCamera
 		(
-			Texture cameraSourceTexture, Intrinsics intrinsics, bool flipSourceTextureAVertically, bool normalizeSourceTexture, Camera targetCmaera, RawImage arImage, Texture2D processedCameraTexture, ref bool foundBoard,
-			ref Color32[] tempTransferColors, Texture2D tempTransferTexture, ref Mat camTexMat, ref MatOfPoint2f chessCornersImageMat, Mat camTexGrayMat, Mat camTexGrayUndistortMat, Mat undistortMap1, Mat undistortMap2, ExtrinsicsCalibrator extrinsicsCalibrator
+			Texture cameraSourceTexture, Intrinsics intrinsics, bool flipSourceTextureAVertically, float _conversionFactorFor16BitTexture, bool normalizeSourceTexture, Camera targetCmaera, RawImage arImage, Texture2D processedCameraTexture, ref bool foundBoard,
+			ref Color32[] tempTransferColors, Texture2D tempTransferTexture, ref Mat camTexMat, ref MatOfPoint2f chessCornersImageMat, Mat camTexGrayMat, Mat camTexGrayUndistortMat, Mat undistortMap1, Mat undistortMap2, ExtrinsicsCalibrator extrinsicsCalibrator, bool findAndApplyExtrinsics
 		) {
 			// Update mat texture (If the texture looks correct in Unity, then it needs to be flipped for OpenCV).
 			TrackingToolsHelper.TextureToMat( cameraSourceTexture, !flipSourceTextureAVertically, ref camTexMat, ref tempTransferColors, ref tempTransferTexture );
 
 			// Convert to grayscale if more than one channel, else copy (and convert bit rate if necessary).
-			TrackingToolsHelper.ColorMatToLumanceMat( camTexMat, camTexGrayMat );
+			TrackingToolsHelper.ColorMatToLumanceMat( camTexMat, camTexGrayMat, _conversionFactorFor16BitTexture );
 
 			// Sometimes normalization makes it easier for FindChessboardCorners.
 			if( normalizeSourceTexture ) Core.normalize( camTexGrayMat, camTexGrayMat, 0, 255, Core.NORM_MINMAX, CvType.CV_8U );
@@ -270,21 +285,26 @@ namespace TrackingTools
 			//Calib3d.undistort( _camTexGrayMat, _camTexGrayUndistortMat, _sensorMat, _distortionCoeffsMat );
 			Imgproc.remap( camTexGrayMat, camTexGrayUndistortMat, undistortMap1, undistortMap2, Imgproc.INTER_LINEAR );
 
-			// Find chessboard.
-			foundBoard = TrackingToolsHelper.FindChessboardCorners( camTexGrayUndistortMat, _checkerboard.checkerPatternSize, ref chessCornersImageMat, _fastAndImprecise );
+			if( findAndApplyExtrinsics )
+			{
+				// Find chessboard.
+				foundBoard = TrackingToolsHelper.FindChessboardCorners( camTexGrayUndistortMat, _checkerboard.checkerPatternSize, ref chessCornersImageMat );//, _fastAndImprecise );
 
-			if( foundBoard ) {
-				// Draw chessboard.
-				//if( _showFoundPointsInImage ) TrackingToolsHelper.DrawFoundPattern( _camTexGrayUndistortMatA, _calibrationBoard.checkerPatternSize, _chessCornersImageMat );
+				if( foundBoard ) {
+					// Draw chessboard.
+					//if( _showFoundPointsInImage ) TrackingToolsHelper.DrawFoundPattern( _camTexGrayUndistortMatA, _calibrationBoard.checkerPatternSize, _chessCornersImageMat );
 
-				// Update and apply extrinsics.
-				bool foundExtrinsics = extrinsicsCalibrator.UpdateExtrinsics( _chessCornersWorldMat, chessCornersImageMat, intrinsics ); // TODO: Problem could be here
-				if( foundExtrinsics ) {
-					extrinsicsCalibrator.extrinsics.ApplyToTransform( targetCmaera.transform, _targetCheckerboardTransform );
+					// Update and apply extrinsics.
+					bool foundExtrinsics = extrinsicsCalibrator.UpdateExtrinsics( _chessCornersWorldMat, chessCornersImageMat, intrinsics ); // TODO: Problem could be here
+					if( foundExtrinsics ) {
+						extrinsicsCalibrator.extrinsics.ApplyToTransform( targetCmaera.transform, _targetCheckerboardTransform );
+					}
+					arImage.gameObject.SetActive( foundExtrinsics );
+				} else {
+					arImage.gameObject.SetActive( false );
 				}
-				arImage.gameObject.SetActive( foundExtrinsics );
 			} else {
-				arImage.gameObject.SetActive( false );
+				if( !arImage.gameObject.activeSelf ) arImage.gameObject.SetActive( true );
 			}
 
 			// UI.
@@ -292,16 +312,49 @@ namespace TrackingTools
 		}
 
 
+
+		void OnAction()
+		{
+			switch( _state )
+			{
+				case State.Sampling:
+					Sample();
+					// Done after sampling 4 sets.
+					if( _chessCornersWorldSamplesMat.Count == targetSampleCount )
+					{
+						// Compute.
+						_stereoExtrinsicsCalibrator.Update( _intrinsicsB, _intrinsicsA );
+
+						// Apply.
+						_stereoExtrinsicsCalibrator.extrinsics.ApplyToTransform( _targetCameraB.transform, _targetCameraA.transform );
+						_targetCameraB.transform.SetParent( _targetCameraA.transform );
+
+						// Change button text.
+						_actionButton.GetComponentInChildren<Text>().text = "Save To File";
+
+						// Change state.
+						_state = State.Testing;
+					}
+					break;
+
+				case State.Testing:
+					SaveToFile();
+					break;
+			}
+		}
+
+
+
 		void Sample()
 		{
 			// If we are in fast and imprecise mode, then detect and update again with higher precision before saving.
-			if( _fastAndImprecise ) {
-				TrackingToolsHelper.FindChessboardCorners( _camTexGrayUndistortMatA, _checkerboard.checkerPatternSize, ref _chessCornersImageMatA );
-				_extrinsicsCalibratorA.UpdateExtrinsics( _chessCornersWorldMat, _chessCornersImageMatA, _intrinsicsA );
-
-				TrackingToolsHelper.FindChessboardCorners( _camTexGrayUndistortMatB, _checkerboard.checkerPatternSize, ref _chessCornersImageMatB );
-				_extrinsicsCalibratorB.UpdateExtrinsics( _chessCornersWorldMat, _chessCornersImageMatB, _intrinsicsB );
-			}
+			//if( _fastAndImprecise ) {
+			//	TrackingToolsHelper.FindChessboardCorners( _camTexGrayUndistortMatA, _checkerboard.checkerPatternSize, ref _chessCornersImageMatA );
+			//	_extrinsicsCalibratorA.UpdateExtrinsics( _chessCornersWorldMat, _chessCornersImageMatA, _intrinsicsA );
+			//
+			//	TrackingToolsHelper.FindChessboardCorners( _camTexGrayUndistortMatB, _checkerboard.checkerPatternSize, ref _chessCornersImageMatB );
+			//	_extrinsicsCalibratorB.UpdateExtrinsics( _chessCornersWorldMat, _chessCornersImageMatB, _intrinsicsB );
+			//}
 
 			if( !_extrinsicsCalibratorA.isValid || !_extrinsicsCalibratorB.isValid ) {
 				Debug.LogWarning( "Save extrinsics to file failed. No chessboard was found in camera image.\n" );
@@ -312,47 +365,18 @@ namespace TrackingTools
 			_chessCornersImageSamplesMatA.Add( _chessCornersImageMatA.clone() );
 			_chessCornersImageSamplesMatB.Add( _chessCornersImageMatB.clone() );
 
-			// Allow saving after 4 samples.
-			if( _chessCornersWorldSamplesMat.Count == targetSampleCount ) {
-				_actionButton.GetComponentInChildren<Text>().text = "Save To File";
-				_actionButton.onClick.RemoveAllListeners();
-				_actionButton.onClick.AddListener( () => SaveToFile() );
-			}
+			_stereoExtrinsicsCalibrator.AddSample( _chessCornersWorldMat, _chessCornersImageMatA, _chessCornersImageMatB );
 		}
+
 		
 
 		void SaveToFile( string optionalFileName = null )
 		{
-			if( !string.IsNullOrEmpty( optionalFileName ) ) _defaultExtrinsicsFileName = optionalFileName;
+			if( !string.IsNullOrEmpty( optionalFileName ) ) _extrinsicsFileName = optionalFileName;
 
-			// Set flags.
-			int flag = 0;
-			flag |= Calib3d.CALIB_FIX_INTRINSIC;    // Don't recompute and change intrinsics parameters.
-			flag |=                                 // Don't recompute distortions, ignore them. We assume the incoming points have already bee undistorted.
-				Calib3d.CALIB_FIX_TANGENT_DIST |
-				Calib3d.CALIB_FIX_K1 |
-				Calib3d.CALIB_FIX_K2 |
-				Calib3d.CALIB_FIX_K3 |
-				Calib3d.CALIB_FIX_K4 |
-				Calib3d.CALIB_FIX_K5;
-			
-			// Compute!
-			Calib3d.stereoCalibrate
-			(
-				_chessCornersWorldSamplesMat, _chessCornersImageSamplesMatA, _chessCornersImageSamplesMatB,
-				_sensorMatA, _noDistCoeffs,
-				_sensorMatB, _noDistCoeffs,
-				new Size(),
-				_rotation3x3Mat, _translationVecMat, _essentialMat, _fundamentalMat,
-				flag
-			);
+			_stereoExtrinsicsCalibrator.extrinsics.SaveToFile( _extrinsicsFileName );
 
-			// Save.
-			Extrinsics extrinsics = new Extrinsics();
-			extrinsics.UpdateFromOpenCvStereoCalibrate( _rotation3x3Mat, _translationVecMat );
-			extrinsics.SaveToFile( _defaultExtrinsicsFileName );
-
-			Debug.Log( logPrepend + "Saved extrinsics to file.\n" + _defaultExtrinsicsFileName );
+			Debug.Log( logPrepend + "Saved extrinsics to file.\n" + TrackingToolsHelper.GetExtrinsicsFilePath( _extrinsicsFileName ) + "\n" + _stereoExtrinsicsCalibrator.extrinsics.ToString() );
 		}
 
 

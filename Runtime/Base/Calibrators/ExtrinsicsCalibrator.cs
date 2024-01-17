@@ -35,9 +35,9 @@ namespace TrackingTools
 
 		public bool UpdateExtrinsics( MatOfPoint3f patternPointsWorldMat, MatOfPoint2f patternPointsImageMat, Intrinsics intrinsics )
 		{
-			intrinsics.ApplyToToOpenCV( ref _sensorMatrix );
 
 			// In order to match OpenCV's pixel space (zero at top-left) and Unity's camera space (up is positive), we flip the sensor matrix vertically.
+			intrinsics.ApplyToToOpenCV( ref _sensorMatrix );
 			_sensorMatrix.WriteValue( - _sensorMatrix.ReadValue( 1, 1 ), 1, 1 ); // fy
 
 			// Find pattern pose, relative to camera (at zero position) using solvePnP.

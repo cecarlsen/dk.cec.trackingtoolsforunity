@@ -64,7 +64,7 @@ namespace TrackingTools
 		Intrinsics _cameraIntrinsics;
 		ExtrinsicsCalibrator _cameraExtrinsicsCalibrator;
 		IntrinsicsCalibrator _projectorIntrinsicsCalibrator;
-		ProjectorFromCameraExtrinsicsCalibrator _projectorExtrinsicsCalibrator;
+		StereoExtrinsicsCalibrator _stereoExtrinsicsCalibrator;
 
 		State _state = State.Initiating;
 
@@ -217,7 +217,7 @@ namespace TrackingTools
 
 			// Prepare OpenCV.
 			_cameraExtrinsicsCalibrator = new ExtrinsicsCalibrator();
-			_projectorExtrinsicsCalibrator = new ProjectorFromCameraExtrinsicsCalibrator();
+			_stereoExtrinsicsCalibrator = new StereoExtrinsicsCalibrator();
 			_noDistCoeffs = new MatOfDouble( new double[] { 0, 0, 0, 0 } );
 			_circlePointsProjectorRenderImageMat = new MatOfPoint2f();
 			_circlePointsRealModelMat = new MatOfPoint3f();
@@ -510,7 +510,7 @@ namespace TrackingTools
 		void Sample()
 		{
 			_projectorIntrinsicsCalibrator.AddSample( _circlePointsRealModelMat, _circlePointsProjectorRenderImageMat );
-			_projectorExtrinsicsCalibrator.AddSample( _circlePointsDetectedWorldMat, _circlePointsCameraImageMat, _circlePointsProjectorRenderImageMat );
+			_stereoExtrinsicsCalibrator.AddSample( _circlePointsDetectedWorldMat, _circlePointsCameraImageMat, _circlePointsProjectorRenderImageMat );
 			_stableFrameCount = 0;
 
 			// Update projector intrinsics and extrinnsics.
@@ -624,11 +624,11 @@ namespace TrackingTools
 				useTextureAspect: true				// We asume that the aspect is as advertised.
 			);
 
-			_projectorExtrinsicsCalibrator.Update( _cameraIntrinsics, _projectorIntrinsicsCalibrator.intrinsics, _projectorIntrinsicsCalibrator.textureSize );
+			_stereoExtrinsicsCalibrator.Update( _cameraIntrinsics, _projectorIntrinsicsCalibrator.intrinsics );
 
 			// Apply.
 			_projectorIntrinsicsCalibrator.intrinsics.ApplyToUnityCamera( _projectorCamera );
-			_projectorExtrinsicsCalibrator.extrinsics.ApplyToTransform( _projectorCamera.transform );
+			_stereoExtrinsicsCalibrator.extrinsics.ApplyToTransform( _projectorCamera.transform );
 		}
 
 
@@ -781,7 +781,7 @@ namespace TrackingTools
 		void UndoSample()
 		{
 			if( sampleCount <= blindSampleCountTarget ) return;
-			_projectorExtrinsicsCalibrator.RemovePreviousSample();
+			_stereoExtrinsicsCalibrator.RemovePreviousSample();
 			UpdateProjectorIntrinsicsAndExtrinsics();
 		}
 
@@ -791,7 +791,7 @@ namespace TrackingTools
 			string intrinsicsFileName = _projectorIntrinsicsFileName;
 			if( _addErrorValueToIntrinsicsFileName ) intrinsicsFileName += "_E-" + _projectorIntrinsicsCalibrator.rmsError.ToString( "F02" ).Replace( ".", "," );
 			string intrinsicsFilePath = _projectorIntrinsicsCalibrator.intrinsics.SaveToFile( intrinsicsFileName );
-			string extrinsicsFilePath = _projectorExtrinsicsCalibrator.extrinsics.SaveToFile( _projectorExtrinsicsFileName );
+			string extrinsicsFilePath = _stereoExtrinsicsCalibrator.extrinsics.SaveToFile( _projectorExtrinsicsFileName );
 
 			Debug.Log( logPrepend + "Saves files\n" + intrinsicsFilePath + "\n" + extrinsicsFilePath );
 

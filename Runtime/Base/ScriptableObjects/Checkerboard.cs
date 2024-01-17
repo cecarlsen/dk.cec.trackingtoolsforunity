@@ -1,5 +1,5 @@
 /*
-	Copyright © Carl Emil Carlsen 2022
+	Copyright © Carl Emil Carlsen 2022-2024
 	http://cec.dk
 */
 
@@ -12,6 +12,6 @@ namespace TrackingTools
 	{
 		[Tooltip( "Number of inner corners" )] public Vector2Int checkerPatternSize;
 		[Tooltip( "Millimeters" )] public int checkerTileSize;
-		[Tooltip( "See OpenCV docs on 'CALIB_CB_MARKER'" )] public bool hasMaker;
+		[Tooltip( "See OpenCV docs on 'CALIB_CB_MARKER'" )] public bool hasMarker;
 	}
 }

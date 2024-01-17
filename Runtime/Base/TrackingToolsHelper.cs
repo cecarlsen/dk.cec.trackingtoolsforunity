@@ -54,9 +54,11 @@ namespace TrackingTools
 		{
 			if( mat == null ) mat = GetCompatibleMat( texture );
 
+			//Debug.Log( texture.name + " [" + texture.graphicsFormat + "] to Mat: " + CvType.typeToString( mat.type() ) );
+
 			int w = texture.width;
 			int h = texture.height;
-			int pxCount = h*w;
+			int pxCount = h * w;
 
 			if( texture is WebCamTexture ) {
 				WebCamTexture webCamTex = texture as WebCamTexture;
@@ -81,7 +83,7 @@ namespace TrackingTools
 		}
 
 
-		public static void ColorMatToLumanceMat( Mat colorTexMat, Mat grayTexMat )
+		public static void ColorMatToLumanceMat( Mat colorTexMat, Mat grayTexMat, float conversionFactorFor16BitTextures = 1f )
 		{
 			bool isCameraTexture16Bit = colorTexMat.depth() == CvType.CV_16U;
 			if( colorTexMat.channels() > 1 ) {
@@ -93,7 +95,8 @@ namespace TrackingTools
 				}
 			} else {
 				if( isCameraTexture16Bit ) {
-					colorTexMat.convertTo( grayTexMat, CvType.CV_8U, 1 / 256.0 );
+					const double sixteenToEightBitRatio = 1.0 / 256.0;
+					colorTexMat.convertTo( grayTexMat, CvType.CV_8U, sixteenToEightBitRatio * conversionFactorFor16BitTextures );
 				} else {
 					colorTexMat.copyTo( grayTexMat );
 				}
@@ -190,7 +193,16 @@ namespace TrackingTools
 		}
 
 
-		public static bool FindChessboardCorners( Mat grayTexMat, Vector2Int innerCornerCount, ref MatOfPoint2f cornerPoints, bool fastAndImprecise = false, bool hasMarker = false )
+		/// <summary>
+		/// Find chessboard in image.
+		/// </summary>
+		/// <param name="sourceTexMat">Source image must be an 8-bit grayscale or color image.</param>
+		/// <param name="innerCornerCount"></param>
+		/// <param name="cornerPoints"></param>
+		/// <param name="fastAndImprecise"></param>
+		/// <param name="hasMarker"></param>
+		/// <returns></returns>
+		public static bool FindChessboardCorners( Mat sourceTexMat, Vector2Int innerCornerCount, ref MatOfPoint2f cornerPoints, bool fastAndImprecise = false, bool hasMarker = false )
 		{
 			Vector2IntToSize( innerCornerCount, ref _tempSize );
 			if( cornerPoints == null ) cornerPoints = new MatOfPoint2f();
@@ -223,7 +235,7 @@ namespace TrackingTools
 				}
 				// Calib3d.CALIB_CB_NORMALIZE_IMAGE;	// Normalize the image gamma with equalizeHist before detection
 			
-				success = Calib3d.findChessboardCornersSB( grayTexMat, _tempSize, cornerPoints, flagsSB );
+				success = Calib3d.findChessboardCornersSB( sourceTexMat, _tempSize, cornerPoints, flagsSB );
 			//}
 			
 			return success;

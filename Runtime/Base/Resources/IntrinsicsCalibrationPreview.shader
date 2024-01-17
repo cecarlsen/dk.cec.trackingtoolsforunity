@@ -62,8 +62,8 @@
 				
 				fixed4 col = fixed4( brightness.xxx, 1 );
 
-				if( brightness >= 0.999 ) col.rgb = fixed3( 1, 0, 0 );		// Red for whiteout
-				else if( brightness == 0.0 ) col.rgb = fixed3( 0, 0, 1 );	// Blue for blackout
+				if( brightness >= 1.0 ) col.rgb = fixed3( 1, 0, 0 );		// Red for whiteout
+				else if( brightness <= 0.0 ) col.rgb = fixed3( 0, 0, 1 );	// Blue for blackout
 
 				col.rgb = lerp( col.rgb, fixed3(1,1,1), _Whiteout );
 
