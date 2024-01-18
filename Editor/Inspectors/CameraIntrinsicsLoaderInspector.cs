@@ -9,6 +9,7 @@ using UnityEditor;
 namespace TrackingTools
 {
 	[CustomEditor(typeof(CameraIntrinsicsLoader))]
+	[CanEditMultipleObjects]
 	public class CameraIntrinsicsLoaderInspector : Editor
 	{
 		CameraIntrinsicsLoader _component;

@@ -13,9 +13,14 @@ namespace TrackingTools
 		[SerializeField] string _intrinsicsFileName = "DefaultCamera";
 		[SerializeField] AutoLoadTime _autoLoadTime = AutoLoadTime.Awake;
 		[SerializeField] bool _logActions = true;
+		[SerializeField] bool _drawFrustumAlways = false;
+		[SerializeField] Color _frustumGizmoColor = new Color( 1f, 1f, 1f, 0.5f );
 
 		[System.Serializable] enum AutoLoadTime { Awake, OnEnable, Start, Off }
 
+		Camera _cam;
+
+		bool _gizmoSelected;
 
 		static string logPrepend = "<b>[" + nameof( CameraIntrinsicsLoader) + "]</b> ";
 
@@ -23,6 +28,7 @@ namespace TrackingTools
 		void Awake()
 		{
 			if( _autoLoadTime == AutoLoadTime.Awake ) LoadAndApply();
+
 		}
 
 
@@ -46,10 +52,24 @@ namespace TrackingTools
 				return;
 			}
 
-			Camera cam = GetComponent<Camera>();
-			intrinsics.ApplyToUnityCamera( cam );
+			if( !_cam ) _cam = GetComponent<Camera>();
+			if( !_cam ) return;
+
+			intrinsics.ApplyToUnityCamera( _cam );
 
 			if( _logActions ) Debug.Log( logPrepend + "Loaded intrinsics from file at '" + TrackingToolsHelper.GetIntrinsicsFilePath( _intrinsicsFileName ) + "'.\n" );
+		}
+
+
+		void OnDrawGizmos()
+		{
+			if( !_drawFrustumAlways ) return;
+
+			if( !_cam ) _cam = GetComponent<Camera>();
+			if( !_cam ) return;
+			
+			Gizmos.color = _frustumGizmoColor;
+			TrackingToolsGizmos.DrawWireFrustum( _cam.worldToCameraMatrix, _cam.projectionMatrix );
 		}
 	}
 }
