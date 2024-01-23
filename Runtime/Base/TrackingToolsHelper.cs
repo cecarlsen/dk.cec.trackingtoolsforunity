@@ -48,7 +48,7 @@ namespace TrackingTools
 
 		/// <summary>
 		/// Converts texture to mat depending on their type.
-		/// Note that if the texture looks correct in Unity, then it needs to be flipped for OpenCV
+		/// Note that if the texture looks correct in Unity, then it needs to be flipped for OpenCV.
 		/// </summary>
 		public static void TextureToMat( Texture texture, bool flipTexture, ref Mat mat, ref Color32[] tempTransferColors, ref Texture2D tempTransferTexture )
 		{

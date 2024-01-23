@@ -18,6 +18,11 @@ namespace TrackingTools
 		public int frameHistoryCapacity => _frameHistoryCapacity;
 
 		/// <summary>
+		/// Number of history frames that is stored.
+		/// </summary>
+		public abstract int frameHistoryCount { get; }
+
+		/// <summary>
 		/// Number of frames counted since last Unity update.
 		/// </summary>
 		public abstract int framesSinceLastUnityUpdate { get; }

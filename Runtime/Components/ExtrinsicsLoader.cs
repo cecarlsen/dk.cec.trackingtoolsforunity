@@ -14,6 +14,8 @@ namespace TrackingTools
 		[SerializeField] AutoLoadTime _autoLoadTime = AutoLoadTime.Awake;
 		[SerializeField] bool _inverse = false;
 		[SerializeField] bool _isMirrored = false;
+		[SerializeField] Vector3 _postOffsetLocal = Vector3.zero;
+		[SerializeField] Vector3 _postOffsetGlobal = Vector3.zero;
 		[SerializeField] bool _embedInAnchorTransform = false;
 		[SerializeField] bool _updateContinously = false;
 		[SerializeField] bool _logActions = true;
@@ -45,7 +47,7 @@ namespace TrackingTools
 
 		void Update()
 		{
-			if( _updateContinously ) _extrinsics.ApplyToTransform( transform, _anchorTransform, _inverse, _isMirrored );
+			if( _updateContinously ) Apply();
 		}
 
 
@@ -56,11 +58,26 @@ namespace TrackingTools
 				return;
 			}
 
+			Apply();
+
+			if( _logActions ) Debug.Log( logPrepend + "Loaded extrinsics from file at '" + TrackingToolsHelper.GetExtrinsicsFilePath( _extrinsicsFileName ) + "'.\n" + _extrinsics.ToString() );
+		}
+
+
+		void Apply()
+		{
 			_extrinsics.ApplyToTransform( transform, _anchorTransform, _inverse, _isMirrored );
 
 			if( _anchorTransform && _embedInAnchorTransform ) transform.SetParent( _anchorTransform );
 
-			if( _logActions ) Debug.Log( logPrepend + "Loaded extrinsics from file at '" + TrackingToolsHelper.GetExtrinsicsFilePath( _extrinsicsFileName ) + "'.\n" + _extrinsics.ToString() );
+			transform.Translate( _postOffsetLocal, Space.Self );
+			transform.Translate( _postOffsetGlobal, Space.World );
+		}
+
+
+		void OnValidate()
+		{
+			if( Application.isPlaying && _extrinsics != null ) Apply();
 		}
 	}
 }

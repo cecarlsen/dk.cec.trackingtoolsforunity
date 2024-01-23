@@ -269,11 +269,11 @@ namespace TrackingTools
 
 		void UpdatePreviewForCamera
 		(
-			Texture cameraSourceTexture, Intrinsics intrinsics, bool flipSourceTextureAVertically, float _conversionFactorFor16BitTexture, bool normalizeSourceTexture, Camera targetCmaera, RawImage arImage, Texture2D processedCameraTexture, ref bool foundBoard,
+			Texture cameraSourceTexture, Intrinsics intrinsics, bool flipSourceTextureVertically, float _conversionFactorFor16BitTexture, bool normalizeSourceTexture, Camera targetCmaera, RawImage arImage, Texture2D processedCameraTexture, ref bool foundBoard,
 			ref Color32[] tempTransferColors, Texture2D tempTransferTexture, ref Mat camTexMat, ref MatOfPoint2f chessCornersImageMat, Mat camTexGrayMat, Mat camTexGrayUndistortMat, Mat undistortMap1, Mat undistortMap2, ExtrinsicsCalibrator extrinsicsCalibrator, bool findAndApplyExtrinsics
 		) {
 			// Update mat texture (If the texture looks correct in Unity, then it needs to be flipped for OpenCV).
-			TrackingToolsHelper.TextureToMat( cameraSourceTexture, !flipSourceTextureAVertically, ref camTexMat, ref tempTransferColors, ref tempTransferTexture );
+			TrackingToolsHelper.TextureToMat( cameraSourceTexture, !flipSourceTextureVertically, ref camTexMat, ref tempTransferColors, ref tempTransferTexture );
 
 			// Convert to grayscale if more than one channel, else copy (and convert bit rate if necessary).
 			TrackingToolsHelper.ColorMatToLumanceMat( camTexMat, camTexGrayMat, _conversionFactorFor16BitTexture );

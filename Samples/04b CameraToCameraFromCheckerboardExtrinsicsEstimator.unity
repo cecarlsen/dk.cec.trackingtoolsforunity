@@ -450,10 +450,11 @@ MonoBehaviour:
   _intrinsicsAFileName: DefaultCameraA
   _intrinsicsBFileName: DefaultCameraB
   _checkerboard: {fileID: 11400000, guid: 6eedf21781e3dec409c0c7f8c925e708, type: 2}
+  _conversionFactorFor16BitTextureA: 50
+  _conversionFactorFor16BitTextureB: 1
   _normalizeSourceATexture: 1
   _normalizeSourceBTexture: 1
-  _fastAndImprecise: 1
-  _defaultExtrinsicsFileName: CameraAToCameraBExtrinsics
+  _extrinsicsFileName: DefaultCameraFromChessboard
   _processedCameraImageA: {fileID: 1516999709}
   _processedCameraImageB: {fileID: 759242285}
   _actionButton: {fileID: 1211323795}

@@ -1,3 +1,11 @@
+
+
+
+## 0.1.8 (2024/01/22)
+
+- Added optional offset to ExtrinsicsLoader
+
+
 ## 0.1.7 (2024/01/17)
 
 - Fixed issue with CameraToCameraFromCheckerboardExtrinsicsEstimator.
