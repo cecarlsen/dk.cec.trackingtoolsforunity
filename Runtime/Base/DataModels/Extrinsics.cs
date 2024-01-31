@@ -112,6 +112,13 @@ namespace TrackingTools
 		}
 
 
+		public void UpdateFromTransform( Transform transform )
+		{
+			rotation = transform.rotation;
+			translation = transform.position;
+		}
+
+
 		public override string ToString()
 		{
 			return "translation: " + translation + ", rotation: " + rotation;

@@ -1,6 +1,10 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2018-2023
+	Copyright © Carl Emil Carlsen 2018-2024
 	http://cec.dk
+
+	Trouble shooting
+	- If you get 'Calib3d.solvePnP failed' warnings, then try to add more points. The method does seem to like single points in one dimension.
+
 */
 
 using System.IO;
@@ -24,7 +28,7 @@ namespace TrackingTools
 
 		[Header("Output")]
 		[SerializeField] Camera _virtualCamera = null;
-		
+
 		[Header("UI")]
 		[SerializeField] Canvas _canvas = null;
 		[SerializeField] KeyCode _interactableHotKey = KeyCode.Alpha1;
@@ -32,7 +36,7 @@ namespace TrackingTools
 		[SerializeField] Font _font = null;
 		[SerializeField] int _fontSize = 12;
 		[SerializeField,Range(0f,1f)] float _virtualAlpha = 0.8f;
-		[SerializeField,Range(1f,20f)] float _physicalBrightness = 1f;
+		[SerializeField,Range(1f,25f)] float _physicalBrightness = 1f;
 		[SerializeField,Tooltip("Optional")] RectTransform _containerUI;
 
 		[Header("Gizmos")]
@@ -168,7 +172,7 @@ namespace TrackingTools
 			_virtualCameraImageUI.transform.SetParent( _containerUI.transform );
 			_virtualCameraImageUI.rectTransform.FitParent();
 			_virtualAlphaGroup = _virtualCameraImageUI.gameObject.AddComponent<CanvasGroup>();
-			_uiMaterial = new Material( Shader.Find( "Hidden/SingleChannelTexture" ) );
+			_uiMaterial = new Material( Shader.Find( "UI/ScalarTexture" ) );
 			_physicalCameraImageUI.material = _uiMaterial;
 			_aspectFitterUI = _containerUI.gameObject.AddComponent<AspectRatioFitter>();
 			_aspectFitterUI.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
@@ -207,7 +211,7 @@ namespace TrackingTools
 				Debug.LogError( logPrepend + "Missing instrinsics file: '" + _physicalCameraIntrinsicsFileName + "'\n" );
 				return;
 			}
-			TryLoadWorldPoints();
+			TryLoadAnchorPoints();
 			
 			// Apply intrinsics.
 			_intrinsics.ApplyToUnityCamera( _virtualCamera );
@@ -264,10 +268,11 @@ namespace TrackingTools
 				interactable = !interactable;
 			}
 
+			// Adapt resources.
+			if( _physicalCameraTexture ) AdaptResources();
+
 			if( _interactable )
 			{
-				// Adapt resources.
-				AdaptResources();
 				if( _dirtyTexture )
 				{
 					//if( _undistortOnGpu ){
@@ -460,22 +465,25 @@ namespace TrackingTools
 			// Update points.
 			for( int p = 0; p < _worldPointTransforms.Length; p++ )
 			{
-				Vector2 posImage = _userPointRects[ p ].anchorMin;
+				Vector2 posImage = _userPointRects[ p ].anchorMin; // Min and max should be the same.
 				posImage.y = 1f - posImage.y; // OpenCv pixels are flipped vertically.
 				posImage.Scale( new Vector2( _intrinsics.width, _intrinsics.height ) );
 				_calibrationPointsImage[ p ].set( new double[]{ posImage.x, posImage.y } );
 				Vector3 posWorld = _worldPointTransforms[ p ].position;
 				_calibrationPointsWorld[ p ].set( new double[]{ posWorld.x, posWorld.y, posWorld.z } );
+				//Debug.Log( posWorld + " -> " + _calibrationPointsWorld[ p ] );
 			}
 			_calibrationPointsImageMat.fromArray( _calibrationPointsImage );
-			_calibrationPointsWorldMat.fromArray( _calibrationPointsWorld ); 
-			
+			_calibrationPointsWorldMat.fromArray( _calibrationPointsWorld );
+
+			//Debug.Log( _calibrationPointsWorldMat.dump() );
+
 			_extrinsicsCalibrator.UpdateExtrinsics( _calibrationPointsWorldMat, _calibrationPointsImageMat, _intrinsics );
 			
 			_extrinsicsCalibrator.extrinsics.ApplyToTransform( _virtualCamera.transform );
 
 			// Save.
-			SaveCircleAnchorPoints();
+			SaveAnchorPoints();
 		}
 	
 
@@ -489,7 +497,7 @@ namespace TrackingTools
 		}
 
 
-		void TryLoadWorldPoints()
+		void TryLoadAnchorPoints()
 		{
 			string filePath = TrackingToolsConstants.worldPointSetsDirectoryPath + "/" + _calibrationPointsFileName + ".json";
 			if( !File.Exists( filePath ) ) return;
@@ -506,7 +514,7 @@ namespace TrackingTools
 		}
 
 
-		void SaveCircleAnchorPoints()
+		void SaveAnchorPoints()
 		{
 			if( !Directory.Exists( TrackingToolsConstants.worldPointSetsDirectoryPath ) ) Directory.CreateDirectory( TrackingToolsConstants.worldPointSetsDirectoryPath );
 			string filePath = TrackingToolsConstants.worldPointSetsDirectoryPath + "/" + _calibrationPointsFileName + ".json";

@@ -5,6 +5,7 @@
 
 using OpenCVForUnity.CoreModule;
 using OpenCVForUnity.Calib3dModule;
+using System.Diagnostics;
 
 namespace TrackingTools
 {
@@ -40,6 +41,10 @@ namespace TrackingTools
 			intrinsics.ApplyToToOpenCV( ref _sensorMatrix );
 			_sensorMatrix.WriteValue( - _sensorMatrix.ReadValue( 1, 1 ), 1, 1 ); // fy
 
+			UnityEngine.Debug.Log( "_sensorMatrix:\n" + _sensorMatrix.dump() );
+			UnityEngine.Debug.Log( "patternPointsWorldMat:\n" + patternPointsWorldMat.dump() );
+			UnityEngine.Debug.Log( "patternPointsImageMat:\n" + patternPointsImageMat.dump() );
+
 			// Find pattern pose, relative to camera (at zero position) using solvePnP.
 			_isValid = Calib3d.solvePnP(
 				patternPointsWorldMat, patternPointsImageMat, _sensorMatrix, _noDistCoeffs,
@@ -48,6 +53,8 @@ namespace TrackingTools
 
 			if( _isValid ) {
 				_extrinsics.UpdateFromOpenCvSolvePnp( _rotationVecMat, _translationVecMat );
+			} else {
+				UnityEngine.Debug.LogWarning( "Calib3d.solvePnP failed\n" );
 			}
 
 			return _isValid;
