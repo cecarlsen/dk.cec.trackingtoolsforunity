@@ -119,6 +119,20 @@ namespace TrackingTools
 		}
 
 
+		public void Update( Vector3 translation, Quaternion rotation )
+		{
+			this.translation = translation;
+			this.rotation = rotation;
+		}
+
+
+		public void CopyFrom( Extrinsics extrinsics )
+		{
+			translation = extrinsics.translation;
+			rotation = extrinsics.rotation;
+		}
+
+
 		public override string ToString()
 		{
 			return "translation: " + translation + ", rotation: " + rotation;

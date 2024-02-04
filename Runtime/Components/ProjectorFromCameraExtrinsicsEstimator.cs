@@ -423,7 +423,8 @@ namespace TrackingTools
 		}
 
 
-
+		/*
+		// This does not work in URP =(
 		void OnRenderObject()
 		{
 			Camera cam = Camera.current;
@@ -440,6 +441,7 @@ namespace TrackingTools
 			GL.Vertex3( 1, 1, 0 );
 			GL.End();
 		}
+		*/
 
 
 		bool AdaptResources()
