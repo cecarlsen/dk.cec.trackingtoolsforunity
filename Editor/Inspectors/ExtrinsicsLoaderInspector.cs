@@ -9,6 +9,7 @@ using UnityEditor;
 namespace TrackingTools
 {
 	[CustomEditor(typeof( ExtrinsicsLoader ) )]
+	[CanEditMultipleObjects]
 	public class ExtrinsicsLoaderInspector : Editor
 	{
 		ExtrinsicsLoader _component;

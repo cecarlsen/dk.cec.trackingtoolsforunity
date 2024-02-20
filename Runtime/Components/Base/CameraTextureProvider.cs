@@ -9,7 +9,7 @@ namespace TrackingTools
 {
 	public abstract class CameraTextureProvider : MonoBehaviour
 	{
-		[SerializeField,Range(1,30)] protected int _frameHistoryCapacity = 1;
+		[SerializeField,Range(1,120)] protected int _frameHistoryCapacity = 1;
 
 
 		/// <summary>

@@ -24,7 +24,7 @@ namespace TrackingTools
 		[SerializeField] bool _isPhysicalCameraTextureFlipped = true;
 		[SerializeField] bool _isPhysicalCameraTextureDistorted = true;
 		[SerializeField] string _physicalCameraIntrinsicsFileName = "DefaultCamera";
-		[SerializeField] string _calibrationPointsFileName = "DefaultPoints";
+		[SerializeField,Tooltip("Without extension name (which is .json)")] string _calibrationPointsFileName = "DefaultPoints";
 
 		[Header("Output")]
 		[SerializeField] Camera _virtualCamera = null;
@@ -147,6 +147,39 @@ namespace TrackingTools
 		}
 
 
+		/// <summary>
+		/// Reset calibration points to fit current camera perspective.
+		/// </summary>
+		public void ResetCalibrationPoints()
+		{
+			int pointCount = _worldPointTransforms.Length;
+			for( int p = 0; p < pointCount; p++ ) {
+				Vector2 viewportPoint = _virtualCamera.WorldToViewportPoint( _worldPointTransforms[ p ].position );
+				SetAnchoredPosition( _userPointRects[ p ], viewportPoint );
+			}
+		}
+
+
+		/// <summary>
+		/// Set physical camera intrinsics file name without extension.
+		/// </summary>
+		public void SetPhysicalCameraIntrinsicsFileName( string physicalCameraIntrinsicsFileName )
+		{
+			_physicalCameraIntrinsicsFileName = physicalCameraIntrinsicsFileName;
+			TryLoadPhysicalCameraIntrinsics();
+		}
+
+
+		/// <summary>
+		/// Set calibration point file name without extention.
+		/// </summary>
+		public void SetCalibrationPointFileName( string calibrationPointsFileName )
+		{
+			_calibrationPointsFileName = calibrationPointsFileName;
+			TryLoadCalibrationPoints();
+		}
+
+
 		void Awake()
 		{
 			if( _worldPointTransforms == null || _worldPointTransforms.Length < 3 ){
@@ -200,18 +233,14 @@ namespace TrackingTools
 				_userPointImages[p] = pointImage;
 			}
 
-			Reset();
+			ResetCalibrationPoints();
 
 			// Hide.
 			if( !_interactable ) _physicalCameraImageUI.transform.gameObject.SetActive( false );
 
 			// Load files.
-			if( !Intrinsics.TryLoadFromFile( _physicalCameraIntrinsicsFileName, out _intrinsics ) ) {
-				enabled = false;
-				Debug.LogError( logPrepend + "Missing instrinsics file: '" + _physicalCameraIntrinsicsFileName + "'\n" );
-				return;
-			}
-			TryLoadAnchorPoints();
+			TryLoadPhysicalCameraIntrinsics();
+			TryLoadCalibrationPoints();
 			
 			// Apply intrinsics.
 			_intrinsics.ApplyToUnityCamera( _virtualCamera );
@@ -406,7 +435,7 @@ namespace TrackingTools
 		void UpdateInteraction()
 		{
 			if( Input.GetKeyDown( _resetHotKey ) ){
-				Reset();
+				ResetCalibrationPoints();
 				_dirtyPoints = true;
 			}
 			
@@ -485,19 +514,19 @@ namespace TrackingTools
 			// Save.
 			SaveAnchorPoints();
 		}
-	
 
-		public void Reset()
+
+		void TryLoadPhysicalCameraIntrinsics()
 		{
-			int pointCount = _worldPointTransforms.Length;
-			for( int p = 0; p < pointCount; p++ ){
-				Vector2 viewportPoint = _virtualCamera.WorldToViewportPoint( _worldPointTransforms[ p ].position );
-				SetAnchoredPosition( _userPointRects[ p ], viewportPoint );
+			if( !Intrinsics.TryLoadFromFile( _physicalCameraIntrinsicsFileName, out _intrinsics ) ) {
+				enabled = false;
+				Debug.LogError( logPrepend + "Missing instrinsics file: '" + _physicalCameraIntrinsicsFileName + "'\n" );
+				return;
 			}
 		}
 
 
-		void TryLoadAnchorPoints()
+		void TryLoadCalibrationPoints()
 		{
 			string filePath = TrackingToolsConstants.worldPointSetsDirectoryPath + "/" + _calibrationPointsFileName + ".json";
 			if( !File.Exists( filePath ) ) return;

@@ -12,7 +12,14 @@ namespace TrackingTools
 		[SerializeField] string _extrinsicsFileName = "Default";
 		[SerializeField] bool _logActions = true;
 
+		public string extrinsicsFileName {
+			get => _extrinsicsFileName;
+			set => _extrinsicsFileName = value;
+		}
+
+
 		static string logPrepend = "<b>[" + nameof( ExtrinsicsSaver ) + "]</b> ";
+
 
 
 		public void Save()

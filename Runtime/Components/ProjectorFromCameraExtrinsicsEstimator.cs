@@ -764,7 +764,7 @@ namespace TrackingTools
 			float scaleT = _circlePatternScaleSlider.value;
 
 			const float relScaleYMax = 1;
-			const float relScaleYMin = 0.5f;
+			const float relScaleYMin = 0.3f;
 			float relScaleY = Mathf.Lerp( relScaleYMin, relScaleYMax, scaleT );
 
 			float viewHeight = _circlePatternTransform.localScale.y / relScaleY;
