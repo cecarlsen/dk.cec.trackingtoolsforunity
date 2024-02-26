@@ -1,5 +1,5 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2020-2022
+	Copyright © Carl Emil Carlsen 2020-2024
 	http://cec.dk
 
 	Based on and inspired by the following (but written from scratch).
@@ -144,7 +144,7 @@ namespace TrackingTools
 			new Vector3( 0.5f, -0.5f, 0 ),
 			new Vector3( -0.5f, -0.5f, 0 ),
 		};
-		static readonly Vector2Int defaultCirclesPatternSize = new Vector2Int( 3, 9 ); // We need a patter without rotational symmetry, so that OpenCV can figure out what is up and down.
+		static readonly Vector2Int defaultCirclesPatternSize = new Vector2Int( 4, 11 ); // We need a patter without rotational symmetry, so that OpenCV can figure out what is up and down.
 		const float circlePatternBorder = 0.5f; // Relative to horizontal tile size.
 		const float lowMovementThreshold = 0.0008f; // Average chess pattern board movement in meters.
 		const int blindSampleCountTarget = 4;

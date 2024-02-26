@@ -1,6 +1,6 @@
 {
   "name": "dk.cec.trackingtoolsforunity",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "displayName": "Tracking Tools for Unity",
   "description": "Camera and projector calibration helpers based on OpenCV.",
   "author": {

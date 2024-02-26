@@ -14,6 +14,8 @@ namespace TrackingTools
 		[SerializeField] AutoLoadTime _autoLoadTime = AutoLoadTime.Awake;
 		[SerializeField] bool _inverse = false;
 		[SerializeField] bool _isMirrored = false;
+		[SerializeField] Vector3 _postRotationLocal = Vector3.zero;
+		[SerializeField] Vector3 _postRotationGlobal = Vector3.zero;
 		[SerializeField] Vector3 _postOffsetLocal = Vector3.zero;
 		[SerializeField] Vector3 _postOffsetGlobal = Vector3.zero;
 		[SerializeField] bool _embedInAnchorTransform = false;
@@ -25,6 +27,15 @@ namespace TrackingTools
 		Extrinsics _extrinsics;
 
 		static string logPrepend = "<b>[" + nameof( ExtrinsicsLoader ) + "]</b> ";
+
+
+		public Vector3 postRotationLocal {
+			get => _postRotationLocal;
+			set {
+				_postRotationLocal = value;
+				if( _extrinsics != null ) Apply();
+			}
+		}
 
 
 		void Awake()
@@ -66,10 +77,14 @@ namespace TrackingTools
 
 		void Apply()
 		{
+			if( _extrinsics == null ) return;
+
 			_extrinsics.ApplyToTransform( transform, _anchorTransform, _inverse, _isMirrored );
 
 			if( _anchorTransform && _embedInAnchorTransform ) transform.SetParent( _anchorTransform );
 
+			transform.Rotate( _postRotationLocal, Space.Self );
+			transform.Rotate( _postRotationGlobal, Space.World );
 			transform.Translate( _postOffsetLocal, Space.Self );
 			transform.Translate( _postOffsetGlobal, Space.World );
 		}

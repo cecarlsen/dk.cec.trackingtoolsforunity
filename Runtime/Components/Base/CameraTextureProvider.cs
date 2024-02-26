@@ -23,6 +23,11 @@ namespace TrackingTools
 		public abstract int frameHistoryCount { get; }
 
 		/// <summary>
+		/// Total duration of frame history in seconds.
+		/// </summary>
+		public abstract float frameHistoryDuration { get; }
+
+		/// <summary>
 		/// Number of frames counted since last Unity update.
 		/// </summary>
 		public abstract int framesSinceLastUnityUpdate { get; }
@@ -77,5 +82,11 @@ namespace TrackingTools
 		/// Get history frame time in seconds, measured relative to capture begin time. History index 0 is the latest frame while index 1 is the previous frame.
 		/// </summary>
 		public abstract double GetHistoryFrameTime( int historyIndex );
+
+
+		/// <summary>
+		/// Get history frame index at deltay time in seconds.
+		/// </summary>
+		public abstract int GetHistoryFrameIndexAtDelayTime( float delay );
 	}
 }
