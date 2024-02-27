@@ -34,6 +34,7 @@ namespace TrackingTools
 
 		/// <summary>
 		/// Number of frames aquired and available since last Unity update.
+		/// If frameHistoryCapacity is exceeded by the number of incoming frames in a single Unity frame, then framesAquiredSinceLastUnityUpdate may be lower than framesSinceLastUnityUpdate.
 		/// </summary>
 		public abstract int framesAquiredSinceLastUnityUpdate { get; }
 
@@ -87,6 +88,6 @@ namespace TrackingTools
 		/// <summary>
 		/// Get history frame index at deltay time in seconds.
 		/// </summary>
-		public abstract int GetHistoryFrameIndexAtDelayTime( float delay );
+		//public abstract int GetHistoryFrameIndexAtDelayTime( float delay );
 	}
 }
