@@ -3,6 +3,8 @@
 	http://cec.dk
 */
 
+#if UNITY_EDITOR
+
 using UnityEngine;
 using UnityEditor;
 
@@ -77,3 +79,5 @@ namespace TrackingTools
 	}
 
 }
+
+#endif // UNITY_EDITOR
