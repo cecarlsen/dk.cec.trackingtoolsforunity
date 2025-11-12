@@ -17,6 +17,6 @@ namespace TrackingTools
 
 		public const float flashDuration = 0.5f;
 
-		public const float precisionTestDotSize  = 0.005f; // Meters
+		public const float precisionTestDotSize  = 0.005f; // Meters. Dots that are displays to check if calibration worked.
 	}
 }

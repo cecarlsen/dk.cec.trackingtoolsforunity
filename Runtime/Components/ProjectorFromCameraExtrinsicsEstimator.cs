@@ -720,7 +720,7 @@ namespace TrackingTools
 			_circlePointsDetectedWorldMat.alloc( _circlePatternPointCount );
 
 			// Render pattern to texture.
-			_circlePatternBorderSizeUV = TrackingToolsHelper.RenderPattern( _circlePatternSize, TrackingToolsHelper.PatternType.AsymmetricCircleGrid, 2048, ref _circlePatternTexture, ref _patternRenderMaterial, circlePatternBorder, true );
+			_circlePatternBorderSizeUV = TrackingToolsHelper.RenderPattern( _circlePatternSize, TrackingToolsHelper.PatternType.AsymmetricCircleGrid, resolutionMax: 2048, ref _circlePatternTexture, ref _patternRenderMaterial, circlePatternBorder, true );
 			_circlePatternBoardMaterial.mainTexture = _circlePatternTexture;
 
 			// Update transform to match.

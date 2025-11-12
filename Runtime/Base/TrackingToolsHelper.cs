@@ -407,11 +407,11 @@ namespace TrackingTools
 
 					// These values are set from experimentation.
 					const float asymCircleSize = 0.10f;		// When too large, the points are also recognised as a chess pattern
-					const float symCircleSyize = 0.08f;
+					const float symCircleSize = 0.08f;
 					const int circleResolution = 128;
 
 					Vector2 circleSize = new Vector2( 1 / textureProportion.x, 1 / textureProportion.y ) * ( textureAspect > 1 ? step.x : step.y*2 );
-					circleSize *= isAsym ? asymCircleSize : symCircleSyize;
+					circleSize *= isAsym ? asymCircleSize : symCircleSize;
 					for( int ny = 0; ny < patternSize.y; ny++ ) {
 						float y = zero.y - ny * step.y;
 						float ax = isAsym && ny % 2 == 1 ? step.x * 0.5f : 0;
