@@ -9,6 +9,7 @@ using OpenCVForUnity.CoreModule;
 using OpenCVForUnity.ImgprocModule;
 using OpenCVForUnity.Calib3dModule;
 using OpenCVForUnity.UnityUtils;
+using OpenCVForUnity.UnityIntegration;
 
 namespace TrackingTools
 {
@@ -64,18 +65,18 @@ namespace TrackingTools
 				WebCamTexture webCamTex = texture as WebCamTexture;
 				//if( !webCamTex.didUpdateThisFrame ) return; // We can't rely on this field, it seems to not be updated (2020.1)
 				if( tempTransferColors == null || tempTransferColors.Length != pxCount ) tempTransferColors = new Color32[ pxCount ];
-				Utils.webCamTextureToMat( webCamTex, mat, tempTransferColors, flipTexture );
+				OpenCVMatUtils.WebCamTextureToMat( webCamTex, mat, tempTransferColors, flipTexture );
 			} else if( texture is Texture2D ) {
-				Utils.fastTexture2DToMat( texture as Texture2D, mat, flipTexture );
+				OpenCVMatUtils.Texture2DToMatRaw( texture as Texture2D, mat, flipTexture );
 			} else if( texture is RenderTexture ) {
 				RenderTexture renderCamTex = texture as RenderTexture;
-				if( tempTransferTexture == null || tempTransferTexture.width != w || tempTransferTexture.height != h ) {
+				if( !tempTransferTexture || tempTransferTexture.width != w || tempTransferTexture.height != h ) {
 					tempTransferTexture = new Texture2D( w, h, renderCamTex.graphicsFormat, TextureCreationFlags.None );
 				}
 				RenderTexture.active = renderCamTex;
 				tempTransferTexture.ReadPixels( new UnityEngine.Rect( 0, 0, w, h ), 0, 0 );
 				RenderTexture.active = null;
-				Utils.fastTexture2DToMat( tempTransferTexture, mat, flipTexture );
+				OpenCVMatUtils.Texture2DToMatRaw( tempTransferTexture, mat, flipTexture );
 			} else {
 				Debug.LogWarning( logPrepend + "TODO: implement for texture type.\n" + texture );
 				return;
@@ -207,36 +208,24 @@ namespace TrackingTools
 			Vector2IntToSize( innerCornerCount, ref _tempSize );
 			if( cornerPoints == null ) cornerPoints = new MatOfPoint2f();
 
-			bool success;
-			//if( fastAndImprecise )
-			//{
-				//Just give me fast.
-				//const int flags = 
-				//	Calib3d.CALIB_CB_FAST_CHECK;// |
-					//Calib3d.CALIB_CB_NORMALIZE_IMAGE |
-					//Calib3d.CALIB_CB_FILTER_QUADS |
-					//Calib3d.CALIB_CB_ADAPTIVE_THRESH;
-				//success = Calib3d.findChessboardCorners( grayTexMat, _tempSize, cornerPoints, flags );
-
-				// Because the old version prefers to start at black tile corner vs findChessboardCornersSB prefering to start
-				// at white tile corner, we have to reverse the order of points for the old version to match up.
-				//if( success ) ReverseOrder( cornerPoints );
-			
-			//} else {
-				// FindChessboardCornersSB() is supposed to work better than combined findChessboardCorners() and cornerSubPix().
-				int flagsSB = 0;
-				if( !fastAndImprecise ){
-					flagsSB |= Calib3d.CALIB_CB_EXHAUSTIVE; // Run an exhaustive search to improve detection rate. (Note: this seems to have very positive impact).
-					flagsSB |= Calib3d.CALIB_CB_ACCURACY; // Up sample input image to improve sub-pixel accuracy due to aliasing effects. This should be used if an accurate camera calibration is required.
-				}
-				if( hasMarker ){
-					flagsSB |= Calib3d.CALIB_CB_MARKER; // The detected pattern must have a marker
-					flagsSB |= Calib3d.CALIB_CB_LARGER; // The detected pattern is allowed to be larger than patternSize.
-				}
-				// Calib3d.CALIB_CB_NORMALIZE_IMAGE;	// Normalize the image gamma with equalizeHist before detection
-			
-				success = Calib3d.findChessboardCornersSB( sourceTexMat, _tempSize, cornerPoints, flagsSB );
-			//}
+			// Prepare flags.
+			int flagsSB = 0;
+			flagsSB |= Calib3d.CALIB_CB_EXHAUSTIVE; // Run an exhaustive search to improve detection rate.
+			flagsSB |= Calib3d.CALIB_CB_NORMALIZE_IMAGE;	// Normalize the image gamma with equalizeHist before detection
+			if( !fastAndImprecise ){
+				flagsSB |= Calib3d.CALIB_CB_ACCURACY; // Up sample input image to improve sub-pixel accuracy due to aliasing effects. This should be used if an accurate camera calibration is required.
+			}
+			if( hasMarker ){
+				flagsSB |= Calib3d.CALIB_CB_MARKER; // The detected pattern must have a marker
+				flagsSB |= Calib3d.CALIB_CB_LARGER; // The detected pattern is allowed to be larger than patternSize.
+			}
+		
+			// findChessboardCornersSB()
+			// Docs: https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html#gadc5bcb05cb21cf1e50963df26986d7c9
+			// FindChessboardCornersSB() is supposed to work better than combined findChessboardCorners() and cornerSubPix().
+			// "analog to findChessboardCorners but uses a localized radon transformation approximated by box filters being more robust to all sort of noise, 
+			// faster on larger images and is able to directly return the sub-pixel position of the internal chessboard corners."
+			bool success = Calib3d.findChessboardCornersSB( sourceTexMat, _tempSize, cornerPoints, flagsSB );
 			
 			return success;
 		}

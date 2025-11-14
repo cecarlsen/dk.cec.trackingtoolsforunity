@@ -38,7 +38,7 @@ namespace TrackingTools
 		{
 
 			// In order to match OpenCV's pixel space (zero at top-left) and Unity's camera space (up is positive), we flip the sensor matrix vertically.
-			intrinsics.ApplyToToOpenCV( ref _sensorMatrix );
+			intrinsics.ApplyToOpenCV( ref _sensorMatrix );
 			_sensorMatrix.WriteValue( - _sensorMatrix.ReadValue( 1, 1 ), 1, 1 ); // fy
 
 			//UnityEngine.Debug.Log( "_sensorMatrix:\n" + _sensorMatrix.dump() );

@@ -323,7 +323,7 @@ namespace TrackingTools
 		}
 
 
-		public bool ApplyToToOpenCV( ref Mat cameraIntrinsicsMat )
+		public bool ApplyToOpenCV( ref Mat cameraIntrinsicsMat )
 		{
 			if( cameraIntrinsicsMat == null || cameraIntrinsicsMat.IsDisposed || cameraIntrinsicsMat.rows() != 3 || cameraIntrinsicsMat.cols() != 3 ) {
 				cameraIntrinsicsMat = Mat.eye( 3, 3, CvType.CV_64F );

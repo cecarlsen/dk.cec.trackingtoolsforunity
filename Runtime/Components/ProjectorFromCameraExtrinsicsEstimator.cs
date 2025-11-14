@@ -23,6 +23,7 @@ using OpenCVForUnity.CoreModule;
 using OpenCVForUnity.Calib3dModule;
 using OpenCVForUnity.UnityUtils;
 using OpenCVForUnity.ImgprocModule;
+using OpenCVForUnity.UnityIntegration;
 
 namespace TrackingTools
 {
@@ -151,7 +152,7 @@ namespace TrackingTools
 		const int stableFrameCountThresholdForTimedSampling = 20;
 		const int stableFrameCountThresholdForManualSampling = 5;
 
-		static readonly string logPrepend = "<b>[" + nameof( ProjectorFromCameraExtrinsicsEstimator ) + "]</b> ";
+		static readonly string logPrepend = "<b>[" + nameof( ProjectorFromCameraExtrinsicsEstimator ) + "]</b>";
 
 
 		public Texture cameraSourceTexture {
@@ -393,7 +394,7 @@ namespace TrackingTools
 			}
 
 			// Update UI.
-			Utils.fastMatToTexture2D( _camTexGrayUndistortMat, _processedCameraTexture ); // Flips the texture vertically by default
+			OpenCVMatUtils.MatToTexture2DRaw( _camTexGrayUndistortMat, _processedCameraTexture ); // Flips the texture vertically by default
 			_stableSampleMeterFillImage.fillAmount = _stableFrameCount / (float) _stableSampleCountThreshold;
 			_previewFlasher.Update();
 			if( _previewFlasher.changed ) _circlePatternBoardMaterial.color = Color.Lerp( Color.white, Color.black, _previewFlasher.value );
@@ -468,6 +469,7 @@ namespace TrackingTools
 				projWidth = camWidth;
 				projHeight = camHeight;
 			}
+			Debug.Log( $"{logPrepend} Projector resolution: {projWidth} x {projHeight}.\n" );
 
 			// Ensure that camera has right aspect.
 			float projectorAspect = projWidth / (float) projHeight;
@@ -636,7 +638,7 @@ namespace TrackingTools
 
 		void SwitchState( State newState )
 		{
-			Debug.Log( logPrepend + "Switching state to " + newState + "\n" );
+			Debug.Log( $"{logPrepend} Switching state to {newState}.\n" );
 
 			switch( newState )
 			{

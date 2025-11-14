@@ -78,8 +78,8 @@ namespace TrackingTools
 		/// </summary>
 		public void Update( Intrinsics cameraA, Intrinsics cameraB )
 		{
-			cameraA.ApplyToToOpenCV( ref _sensorMatA );
-			cameraB.ApplyToToOpenCV( ref _sensorMatB );
+			cameraA.ApplyToOpenCV( ref _sensorMatA );
+			cameraB.ApplyToOpenCV( ref _sensorMatB );
 
 			// In order to match OpenCV's pixel space (zero at top-left) and Unity's camera space (up is positive), we flip the sensor matrix vertically.
 			_sensorMatA.WriteValue( - _sensorMatA.ReadValue( 1, 1 ), 1, 1 ); // fy

@@ -1,5 +1,5 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2020-2023
+	Copyright © Carl Emil Carlsen 2020-2025
 	http://cec.dk
 
 	Guiding notes about calibration accurency.
@@ -10,8 +10,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Experimental.Rendering;
 using OpenCVForUnity.CoreModule;
-using OpenCVForUnity.UnityUtils;
 using OpenCVForUnity.Calib3dModule;
+using OpenCVForUnity.UnityIntegration;
 
 namespace TrackingTools
 {
@@ -23,7 +23,6 @@ namespace TrackingTools
 		[SerializeField] int _desiredSampleCount = 4; // Four perfect samples should be ideal https://medium.com/@hey_duda/the-magic-behind-camera-calibration-8596b7ddcd71
 		[SerializeField] bool _flipSourceTextureVertically = false;
 		[SerializeField,Tooltip("Some lenses are designed with no distortion.")] bool _linearOpticalLens = false;
-		[SerializeField,Tooltip("Only use when you have bad lighting conditions.")] bool _normalizeSourceTexture = false;
 
 		[Header("Output")]
 		[SerializeField] string _intrinsicsFileName = "240101_DefaultCamera_1280x720";
@@ -87,8 +86,8 @@ namespace TrackingTools
 		enum State
 		{
 			 Initiating,
-			 Calibrating,
-			 Testing
+			 CollectingSamples,
+			 TestingAccuracy
 		}
 
 
@@ -171,31 +170,28 @@ namespace TrackingTools
 			// Convert to grayscale if more than one channel, else copy (and convert bit rate if necessary).
 			TrackingToolsHelper.ColorMatToLumanceMat( _camTexMat, _camTexGrayMat );
 
-			// Sometimes normalization makes it easier for FindChessboardCorners.
-			if( _normalizeSourceTexture ) Core.normalize( _camTexGrayMat, _camTexGrayMat, 0, 255, Core.NORM_MINMAX, CvType.CV_8U );
-
 			// During testing, undistort before.
-			if( _state == State.Testing ) {
+			if( _state == State.TestingAccuracy ) {
 				if( !_linearOpticalLens ) Calib3d.undistort( _camTexGrayMat, _camTexGrayUndistortMat, _intrinsicsCalibrator.sensorMat, _intrinsicsCalibrator.distortionCoeffsMat );
 				else _camTexGrayMat.copyTo( _camTexGrayUndistortMat );
 			}
 
 			// Find chessboard.
-			Mat chessboardSourceMat = _state == State.Calibrating ? _camTexGrayMat : _camTexGrayUndistortMat;
+			Mat chessboardSourceMat = _state == State.CollectingSamples ? _camTexGrayMat : _camTexGrayUndistortMat;
 			bool foundBoard = TrackingToolsHelper.FindChessboardCorners( chessboardSourceMat, _checkerboard.checkerPatternSize, ref _chessCornersImageMat, fastAndImprecise: true, _checkerboard.hasMarker );
 
 			// State dependent updates.
 			switch( _state )
 			{
-				case State.Calibrating: UpdateCalibration( foundBoard ); break;
-				case State.Testing: UpdateTesting( foundBoard ); break;
+				case State.CollectingSamples: UpdateCalibration( foundBoard ); break;
+				case State.TestingAccuracy: UpdateTesting( foundBoard ); break;
 			}
 
 			// Draw chessboard.
 			if( foundBoard ) TrackingToolsHelper.DrawFoundPattern( chessboardSourceMat, _checkerboard.checkerPatternSize, _chessCornersImageMat );
 
 			// During calibration, undistort after.
-			if( _state == State.Calibrating ) {
+			if( _state == State.CollectingSamples ) {
 				if( !_linearOpticalLens && _intrinsicsCalibrator.sampleCount > correctDistortionSampleCountThreshold ) {
 					Calib3d.undistort( _camTexGrayMat, _camTexGrayUndistortMat, _intrinsicsCalibrator.sensorMat, _intrinsicsCalibrator.distortionCoeffsMat );
 				} else {
@@ -204,7 +200,7 @@ namespace TrackingTools
 			}
 
 			// UI.
-			Utils.fastMatToTexture2D( _camTexGrayUndistortMat, _processedCameraTexture ); // Will flip back to Unity orientation by default.
+			OpenCVMatUtils.MatToTexture2DRaw( _camTexGrayUndistortMat, _processedCameraTexture ); // Will flip back to Unity orientation by default.
 			_previewFlasher.Update();
 			UpdateSampleCounterUI();
 
@@ -250,7 +246,7 @@ namespace TrackingTools
 					string intrinsicsFileName = _intrinsicsFileName;
 					if( _addErrorValueToFileName ) intrinsicsFileName += "_E-" + _intrinsicsCalibrator.rmsError.ToString( "F02" ).Replace( ".", "," );
 					string filePath = _intrinsicsCalibrator.intrinsics.SaveToFile( intrinsicsFileName );
-					SwitchState( State.Testing );
+					SwitchState( State.TestingAccuracy );
 
 					Debug.Log( logPrepend + "Saved intrinsics to file.\n" + filePath );
 				}
@@ -275,10 +271,10 @@ namespace TrackingTools
 		{
 			switch( newState )
 			{
-				case State.Calibrating:
+				case State.CollectingSamples:
 					break;
 
-				case State.Testing:
+				case State.TestingAccuracy:
 
 					// UI
 					_sampleCountMeterFillImage.transform.parent.gameObject.SetActive( false );
@@ -314,7 +310,7 @@ namespace TrackingTools
 			_arTexture.name = "AR Texture";
 
 			// Change state.
-			if( _state == State.Initiating ) SwitchState( State.Calibrating );
+			if( _state == State.Initiating ) SwitchState( State.CollectingSamples );
 
 			// Update UI.
 			_aspectFitter.aspectRatio = w / (float) h;
