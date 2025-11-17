@@ -54,7 +54,7 @@ namespace TrackingTools
 
 		/// <summary>
 		/// Add a pair of real space + image space points.
-		/// Beware that calibration can fail if pattern is not rotated to fade forward, so that z is zero.
+		/// Beware that calibration can fail if pattern is not rotated to face forward, so that z is zero.
 		/// Also ensure that the point order in the the two point sets are matching.
 		/// </summary>
 		/// <param name="patternRealModelSample">Must be measured in millimeters</param>

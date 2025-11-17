@@ -161,9 +161,9 @@ namespace TrackingTools
 		/// Updates a collection of points constituting a pattern for recognition. Zero point is at the center.
 		/// </summary>
 		/// <param name="patternSize">For chessbord, count the inner corners</param>
-		/// <param name="transform">The transform must be scaled to fit the aspect of the pattern</param>
+		/// <param name="patternToWorldMatrix">The transform must be scaled to fit the aspect of the pattern</param>
 		/// <param name="patternType">OpenCV supported pattern type</param>
-		/// <param name="patternPointsWorldSpace">Point collection</param>
+		/// <param name="patternBorderSizeUV">Point collection</param>
 		public static void UpdateWorldSpacePatternPoints( Vector2Int patternSize, Matrix4x4 patternToWorldMatrix, PatternType patternType, Vector2 patternBorderSizeUV, ref MatOfPoint3f pointsWorldSpace )
 		{
 			bool isAsym = patternType == PatternType.AsymmetricCircleGrid;

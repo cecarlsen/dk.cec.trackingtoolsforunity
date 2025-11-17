@@ -1,5 +1,5 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2020-2024
+	Copyright © Carl Emil Carlsen 2020-2025
 	http://cec.dk
 
 	Based on and inspired by the following (but written from scratch).
@@ -9,6 +9,20 @@
 
 		Cassinelli Alvaro improved on the solution
 		https://www.youtube.com/watch?v=pCq7u2TvlxU
+
+	Explanation
+		– We set up a real world camera and projector side by side, covring approximately the same area. We know the camera intrinsics and (zero) extrinsics.
+		- We use a calibration board with a printed chess pattern on the right side, and a gray area for a video projected circle pattern on the left side.
+		– To find the projector intrinsics, we need a set of points in the projector image and in real-world (mm) model space.
+		– To find the projector extrinsics (relative to the camera), we need a set of points in the projector image, camera image, and world space.
+		– We detect the chessboard points in the camera image, compute the worlds and use them to find the extrinsics of the chess board.
+		– We detect the projected circle pattern in the camera image, raycast them from the camera onto the board to estimate their world space position.
+		– We find the real-world model circle pattern points by computing the local (2D) point position on the board and converting to millimeters. 
+
+	Notes on sampling
+		– You need 4 unique calibration board poses.
+		– Tilt each of them slightly on the x and y axis (less than 30 degrees).
+		– Make sure both chess and circle patterns are as large as possible in the camera image.
 
 	Note: Perhaps interesting solution by DTU students.
 	https://backend.orbit.dtu.dk/ws/portalfiles/portal/91373186/PhotonicsWest2014.pdf
@@ -21,7 +35,6 @@ using UnityEngine.UI;
 using UnityEngine.Experimental.Rendering;
 using OpenCVForUnity.CoreModule;
 using OpenCVForUnity.Calib3dModule;
-using OpenCVForUnity.UnityUtils;
 using OpenCVForUnity.ImgprocModule;
 using OpenCVForUnity.UnityIntegration;
 
@@ -84,14 +97,14 @@ namespace TrackingTools
 		MatOfDouble _distortionCoeffsMat;
 		MatOfDouble _noDistCoeffs;
 
-		MatOfPoint2f _chessCornersImageMat;
-		MatOfPoint3f _chessCornersWorldMat;
+		MatOfPoint2f _chessPatternImagePoints;
+		MatOfPoint3f _chessPatternWorldPoints;
 
-		MatOfPoint2f _circlePointsProjectorRenderImageMat;
-		MatOfPoint3f _circlePointsRenderedWorldMat;
-		MatOfPoint2f _circlePointsCameraImageMat;
-		MatOfPoint3f _circlePointsRealModelMat;
-		MatOfPoint3f _circlePointsDetectedWorldMat;
+		MatOfPoint2f _circlePatternProjectorRenderImagePoints;
+		MatOfPoint3f _circlePatternRenderedWorldPoints;
+		MatOfPoint2f _circlePatternCameraImagePoints;
+		MatOfPoint3f _circlePatternRealModelPoints;
+		MatOfPoint3f _circlePatternDetectedWorldPoints;
 
 		Mat _undistortMap1;
 		Mat _undistortMap2;
@@ -220,9 +233,9 @@ namespace TrackingTools
 			_cameraExtrinsicsCalibrator = new ExtrinsicsCalibrator();
 			_stereoExtrinsicsCalibrator = new StereoExtrinsicsCalibrator();
 			_noDistCoeffs = new MatOfDouble( new double[] { 0, 0, 0, 0 } );
-			_circlePointsProjectorRenderImageMat = new MatOfPoint2f();
-			_circlePointsRealModelMat = new MatOfPoint3f();
-			_circlePointsDetectedWorldMat = new MatOfPoint3f();
+			_circlePatternProjectorRenderImagePoints = new MatOfPoint2f();
+			_circlePatternRealModelPoints = new MatOfPoint3f();
+			_circlePatternDetectedWorldPoints = new MatOfPoint3f();
 			_undistortMap1 = new Mat();
 			_undistortMap2 = new Mat();
 
@@ -269,7 +282,7 @@ namespace TrackingTools
 			_chessPatternTransform.GetComponent<Renderer>().material = chessboardMaterial;
 			float chessTileSizeMeters = _projectorCheckerboard.checkerTileSize * 0.001f;
 			_chessPatternTransform.localScale = new Vector3( (_projectorCheckerboard.checkerPatternSize.x-1) * chessTileSizeMeters, (_projectorCheckerboard.checkerPatternSize.y-1) * chessTileSizeMeters, 0 );
-			TrackingToolsHelper.UpdateWorldSpacePatternPoints( _projectorCheckerboard.checkerPatternSize, _chessPatternTransform.localToWorldMatrix, TrackingToolsHelper.PatternType.Checkerboard, Vector2.zero, ref _chessCornersWorldMat );
+			TrackingToolsHelper.UpdateWorldSpacePatternPoints( _projectorCheckerboard.checkerPatternSize, _chessPatternTransform.localToWorldMatrix, TrackingToolsHelper.PatternType.Checkerboard, Vector2.zero, ref _chessPatternWorldPoints );
 
 			_circlePatternTransform = GameObject.CreatePrimitive( PrimitiveType.Quad ).transform;
 			_circlePatternTransform.name = "Circlesboard";
@@ -286,8 +299,10 @@ namespace TrackingTools
 			_projectorSampleMeterTransform.name = "ProjectorSampleMeter";
 			_projectorSampleMeterTransform.localScale = new Vector3( _chessPatternTransform.localScale.x, TrackingToolsConstants.precisionTestDotSize, 0 );
 			_projectorSampleMeterTransform.SetParent( _calibrationBoardTransform );
-			float dotOffsetY = ( ( _projectorCheckerboard.checkerPatternSize.y - 4 ) * 0.5f + 1 ) * chessTileSizeMeters;
-			_projectorSampleMeterTransform.localPosition = new Vector3( 0, - dotOffsetY - chessTileSizeMeters );
+			//float dotOffsetY = ( ( _projectorCheckerboard.checkerPatternSize.y / 4 ) * 0.5f + 1 ) * chessTileSizeMeters;
+			float dotOffsetY = ( _projectorCheckerboard.checkerPatternSize.y / 2f + 1f ) * chessTileSizeMeters;
+			//_projectorSampleMeterTransform.localPosition = new Vector3( 0, - dotOffsetY - chessTileSizeMeters );
+			_projectorSampleMeterTransform.localPosition = new Vector3( 0, - dotOffsetY );
 			Material sampleMeterMaterial = new Material( unlitColorShader );
 			_projectorSampleMeterTransform.GetComponent<Renderer>().sharedMaterial = sampleMeterMaterial;
 			_projectorSampleMeterTransform.gameObject.SetActive( false );
@@ -318,23 +333,23 @@ namespace TrackingTools
 
 		void OnDestroy()
 		{
-			if( _camTexMat != null ) _camTexMat.release();
-			if( _camTexGrayMat != null ) _camTexGrayMat.release();
-			if( _camTexGrayUndistortMat != null ) _camTexGrayUndistortMat.release();
-			if( _camTexGrayUndistortInvMat != null ) _camTexGrayUndistortInvMat.release();
-			if( _sensorMat != null ) _sensorMat.release();
-			if( _distortionCoeffsMat != null ) _distortionCoeffsMat.release();
-			if( _noDistCoeffs != null ) _noDistCoeffs.release();
-			if( _arTexture ) _arTexture.Release();
+			_camTexMat?.release();
+			_camTexGrayMat?.release();
+			_camTexGrayUndistortMat?.release();
+			_camTexGrayUndistortInvMat?.release();
+			_sensorMat?.release();
+			_distortionCoeffsMat?.release();
+			_noDistCoeffs?.release();
+			_arTexture?.Release();
 			if( _previewMaterial ) Destroy( _previewMaterial );
 			if( _chessPatternTransform ) Destroy( _chessPatternTransform.gameObject );
-			if( _chessPatternTexture ) _chessPatternTexture.Release();
-			if( _circlePatternTexture ) _chessPatternTexture.Release();
-			if( _projectorIntrinsicsCalibrator != null ) _projectorIntrinsicsCalibrator.Clear();
-			if( _cameraExtrinsicsCalibrator != null ) _cameraExtrinsicsCalibrator.Release();
+			_chessPatternTexture?.Release();
+			_chessPatternTexture?.Release();
+			_projectorIntrinsicsCalibrator?.Clear();
+			_cameraExtrinsicsCalibrator?.Release();
 			if( _screenBorderMaterial != null ) Destroy( _screenBorderMaterial );
-			if( _undistortMap1 != null ) _undistortMap1.release();
-			if( _undistortMap2 != null ) _undistortMap2.release();
+			_undistortMap1?.release();
+			_undistortMap2?.release();
 		}
 
 
@@ -382,7 +397,7 @@ namespace TrackingTools
 
 					// Sample when continuously stable.
 					if(
-						( _stableFrameCount >= _stableSampleCountThreshold && _circlePatternPointCount == _circlePointsDetectedWorldMat.rows() ) &&
+						( _stableFrameCount >= _stableSampleCountThreshold && _circlePatternPointCount == _circlePatternDetectedWorldPoints.rows() ) &&
 						( _operationMode == OperationMode.TimedSampling || ( _operationMode == OperationMode.ManualSamlping && _sampleManuallyRequested ) )
 					){
 						Sample();
@@ -513,8 +528,8 @@ namespace TrackingTools
 
 		void Sample()
 		{
-			_projectorIntrinsicsCalibrator.AddSample( _circlePointsRealModelMat, _circlePointsProjectorRenderImageMat );
-			_stereoExtrinsicsCalibrator.AddSample( _circlePointsDetectedWorldMat, _circlePointsCameraImageMat, _circlePointsProjectorRenderImageMat );
+			_projectorIntrinsicsCalibrator.AddSample( _circlePatternRealModelPoints, _circlePatternProjectorRenderImagePoints );
+			_stereoExtrinsicsCalibrator.AddSample( _circlePatternDetectedWorldPoints, _circlePatternCameraImagePoints, _circlePatternProjectorRenderImagePoints );
 			_stableFrameCount = 0;
 
 			// Update projector intrinsics and extrinnsics.
@@ -547,10 +562,10 @@ namespace TrackingTools
 
 		bool FindAndApplyChessPatternExtrinsics()
 		{
-			bool found = TrackingToolsHelper.FindChessboardCorners( _camTexGrayUndistortMat, _projectorCheckerboard.checkerPatternSize, ref _chessCornersImageMat, fastAndImprecise: true );
+			bool found = TrackingToolsHelper.FindChessboardCorners( _camTexGrayUndistortMat, _projectorCheckerboard.checkerPatternSize, ref _chessPatternImagePoints, fastAndImprecise: true );
 			if( found ) {
-				TrackingToolsHelper.DrawFoundPattern( _camTexGrayUndistortMat, _projectorCheckerboard.checkerPatternSize, _chessCornersImageMat );
-				_cameraExtrinsicsCalibrator.UpdateExtrinsics( _chessCornersWorldMat, _chessCornersImageMat, _cameraIntrinsics );
+				TrackingToolsHelper.DrawFoundPattern( _camTexGrayUndistortMat, _projectorCheckerboard.checkerPatternSize, _chessPatternImagePoints );
+				_cameraExtrinsicsCalibrator.UpdateExtrinsics( _chessPatternWorldPoints, _chessPatternImagePoints, _cameraIntrinsics );
 				_cameraExtrinsicsCalibrator.extrinsics.ApplyToTransform( _calibrationBoardTransform, _mainCamera.transform, inverse: true ); // Transform board instead of camera.
 			}
 			_chessPatternTransform.gameObject.SetActive( found );
@@ -561,12 +576,12 @@ namespace TrackingTools
 		void UpdateCirclePatternInProjectorImage()
 		{
 			// Use the circle pattern transform from last update frame, because it is more likely that it will match the detected reality.
-			TrackingToolsHelper.UpdateWorldSpacePatternPoints( _circlePatternSize, _circlePatternToWorldPrevFrame, TrackingToolsHelper.PatternType.AsymmetricCircleGrid, _circlePatternBorderSizeUV, ref _circlePointsRenderedWorldMat );
+			TrackingToolsHelper.UpdateWorldSpacePatternPoints( _circlePatternSize, _circlePatternToWorldPrevFrame, TrackingToolsHelper.PatternType.AsymmetricCircleGrid, _circlePatternBorderSizeUV, ref _circlePatternRenderedWorldPoints );
 			for( int p = 0; p < _circlePatternPointCount; p++ ) {
-				Vector3 worldPoint = _circlePointsRenderedWorldMat.ReadVector3( p );
+				Vector3 worldPoint = _circlePatternRenderedWorldPoints.ReadVector3( p );
 				Vector3 viewportPoint = _projectorCamera.WorldToViewportPoint( worldPoint );
 				Vector2 imagePoint = new Vector2( viewportPoint.x * _projectorIntrinsicsCalibrator.textureWidth, ( 1 - viewportPoint.y ) * _projectorIntrinsicsCalibrator.textureHeight ); // Viewport space has zero at bottom-left, image space (opencv) has zero at top-left. So flip y.
-				_circlePointsProjectorRenderImageMat.WriteVector2( imagePoint, p );
+				_circlePatternProjectorRenderImagePoints.WriteVector2( imagePoint, p );
 			}
 
 			//TrackingToolsHelper.DrawFoundPattern( _camTexGrayUndistortMat, circlesPatternSize, _circlePointsProjectorRenderImageMat ); // Testing
@@ -577,31 +592,33 @@ namespace TrackingTools
 		{
 			// Find circle pattern in camera image
 			Core.bitwise_not( _camTexGrayUndistortMat, _camTexGrayUndistortInvMat ); // Invert. We need dark circles on a bright background.
-			if( !TrackingToolsHelper.FindAsymmetricCirclesGrid( _camTexGrayUndistortInvMat, _circlePatternSize, ref _circlePointsCameraImageMat ) ) return false;
+			if( !TrackingToolsHelper.FindAsymmetricCirclesGrid( _camTexGrayUndistortInvMat, _circlePatternSize, ref _circlePatternCameraImagePoints ) ) return false;
 
 			// Draw deteted circles.
-			TrackingToolsHelper.DrawFoundPattern( _camTexGrayUndistortMat, _circlePatternSize, _circlePointsCameraImageMat );
+			TrackingToolsHelper.DrawFoundPattern( _camTexGrayUndistortMat, _circlePatternSize, _circlePatternCameraImagePoints );
 
 			// Raycast circles against chessboard plane.
 			_calibrationboardPlane.SetNormalAndPosition( _calibrationBoardTransform.forward, _calibrationBoardTransform.position );
 			for( int p = 0; p < _circlePatternPointCount; p++ )
 			{
 				// Tranform from points detected by camera to points in Unity world space.
-				Vector2 cameraImagePoint = _circlePointsCameraImageMat.ReadVector2( p );
+				Vector2 cameraImagePoint = _circlePatternCameraImagePoints.ReadVector2( p );
 				cameraImagePoint.y = _cameraSourceTexture.height - cameraImagePoint.y; // Unity screen space has zero at bottom-left, OpenCV textures has zero at top-left.
-				Ray ray = _mainCamera.ScreenPointToRay( cameraImagePoint );
+				Ray ray = _mainCamera.ScreenPointToRay( cameraImagePoint ); // We can do this because main camera is outputting to _arTexture, which has the same resolution as the real world camera.
 				float hitDistance;
 				if( !_calibrationboardPlane.Raycast( ray, out hitDistance ) ) return false;
 
 				// For extrinsics calibration (using stereoCalibrate()).
 				Vector3 worldPoint = ray.origin + ray.direction * hitDistance;
-				_circlePointsDetectedWorldMat.WriteVector3( worldPoint, p );
+				_circlePatternDetectedWorldPoints.WriteVector3( worldPoint, p );
 
 				// For intrinsics calibration (using calibrateCamera()).
 				Vector3 realModelPoint = Quaternion.Inverse( _calibrationBoardTransform.rotation ) * ( worldPoint - _calibrationBoardTransform.position );
 				realModelPoint.z = 0; // Remove very small numbers. It seems CalibrateCamera() does not accept varying z values. I got an execption.
 				realModelPoint *= 1000; // To millimeters
-				_circlePointsRealModelMat.WriteVector3( realModelPoint, p );
+				_circlePatternRealModelPoints.WriteVector3( realModelPoint, p );
+
+				//Debug.Log( "p: " + p + ", realModelPoint: " + realModelPoint + ", worldPoint: " + ( worldPoint * 1000 ) );
 			}
 			return true;
 		}
@@ -613,8 +630,8 @@ namespace TrackingTools
 			// of the diviation because it is more intuitive to interpret than Root Mean Square (RMS).
 			_extrinsicsErrorAvgM = 0;
 			for( int i = 0; i < _circlePatternPointCount; i++ ) {
-				Vector3 renderedWorldPoint = _circlePointsRenderedWorldMat.ReadVector3( i );
-				Vector3 detectedWorldPoint = _circlePointsDetectedWorldMat.ReadVector3( i );
+				Vector3 renderedWorldPoint = _circlePatternRenderedWorldPoints.ReadVector3( i );
+				Vector3 detectedWorldPoint = _circlePatternDetectedWorldPoints.ReadVector3( i );
 				_extrinsicsErrorAvgM += Vector3.Distance( renderedWorldPoint, detectedWorldPoint );
 			}
 			_extrinsicsErrorAvgM /= _circlePatternPointCount;
@@ -712,17 +729,17 @@ namespace TrackingTools
 
 			_circlePatternPointCount = _circlePatternSize.x * _circlePatternSize.y;
 
-			if( _circlePointsProjectorRenderImageMat != null && _circlePointsProjectorRenderImageMat.rows() == _circlePatternPointCount ) return;
+			if( _circlePatternProjectorRenderImagePoints != null && _circlePatternProjectorRenderImagePoints.rows() == _circlePatternPointCount ) return;
 
-			if( _circlePointsProjectorRenderImageMat != null  ) _circlePointsProjectorRenderImageMat.release();
-			if( _circlePointsRealModelMat != null  ) _circlePointsRealModelMat.release();
-			if( _circlePointsDetectedWorldMat != null ) _circlePointsDetectedWorldMat.release();
-			_circlePointsProjectorRenderImageMat.alloc( _circlePatternPointCount );
-			_circlePointsRealModelMat.alloc( _circlePatternPointCount );
-			_circlePointsDetectedWorldMat.alloc( _circlePatternPointCount );
+			_circlePatternProjectorRenderImagePoints?.release();
+			_circlePatternRealModelPoints?.release();
+			_circlePatternDetectedWorldPoints?.release();
+			_circlePatternProjectorRenderImagePoints.alloc( _circlePatternPointCount );
+			_circlePatternRealModelPoints.alloc( _circlePatternPointCount );
+			_circlePatternDetectedWorldPoints.alloc( _circlePatternPointCount );
 
 			// Render pattern to texture.
-			_circlePatternBorderSizeUV = TrackingToolsHelper.RenderPattern( _circlePatternSize, TrackingToolsHelper.PatternType.AsymmetricCircleGrid, resolutionMax: 2048, ref _circlePatternTexture, ref _patternRenderMaterial, circlePatternBorder, true );
+			_circlePatternBorderSizeUV = TrackingToolsHelper.RenderPattern( _circlePatternSize, TrackingToolsHelper.PatternType.AsymmetricCircleGrid, resolutionMax: 2048, ref _circlePatternTexture, ref _patternRenderMaterial, circlePatternBorder, invert: true );
 			_circlePatternBoardMaterial.mainTexture = _circlePatternTexture;
 
 			// Update transform to match.
@@ -752,7 +769,7 @@ namespace TrackingTools
 
 		void UpdateSampleMeterProjectorUI()
 		{
-			float t = _stableFrameCount / (float) _stableSampleCountThreshold;
+			float t = Mathf.Min( 1f, _stableFrameCount / (float) _stableSampleCountThreshold );
 			float fullWidth = _chessPatternTransform.localScale.x;
 			_projectorSampleMeterTransform.localPosition = new Vector3( - (1-t) * fullWidth * 0.5f, _projectorSampleMeterTransform.localPosition.y, 0 );
 			_projectorSampleMeterTransform.localScale = new Vector3( t * fullWidth, TrackingToolsConstants.precisionTestDotSize, 0 );
@@ -797,7 +814,7 @@ namespace TrackingTools
 			string intrinsicsFilePath = _projectorIntrinsicsCalibrator.intrinsics.SaveToFile( intrinsicsFileName );
 			string extrinsicsFilePath = _stereoExtrinsicsCalibrator.extrinsics.SaveToFile( _projectorExtrinsicsFileName );
 
-			Debug.Log( logPrepend + "Saves files\n" + intrinsicsFilePath + "\n" + extrinsicsFilePath );
+			Debug.Log( $"{logPrepend} Saved files {intrinsicsFilePath}\n{extrinsicsFilePath}" );
 
 			SwitchState( State.Testing );
 		}
@@ -806,15 +823,15 @@ namespace TrackingTools
 
 		void OnDrawGizmos()
 		{
-			if( _showDotGizmos && _processedCameraTexture != null && _circlePointsRenderedWorldMat != null )
+			if( _showDotGizmos && _processedCameraTexture != null && _circlePatternRenderedWorldPoints != null )
 			{
 				float radius = ( _circlePatternTransform.localScale.y / _circlePatternSize.y ) * 0.1f;
 				Vector3 prevCirclePointRenderWorld = Vector3.zero;
 				Vector3 prevCirclePointWorld = Vector3.zero;
 				for( int p = 0; p < _circlePatternPointCount; p++ )
 				{
-					Vector3 circlePointRenderWorld = _circlePointsRenderedWorldMat.ReadVector3( p );
-					Vector3 circlePointsWorld = _circlePointsDetectedWorldMat.ReadVector3( p );
+					Vector3 circlePointRenderWorld = _circlePatternRenderedWorldPoints.ReadVector3( p );
+					Vector3 circlePointsWorld = _circlePatternDetectedWorldPoints.ReadVector3( p );
 
 					if( p == 0 ) Gizmos.color = Color.red;
 					else if( p == 1 ) Gizmos.color = Color.yellow;
