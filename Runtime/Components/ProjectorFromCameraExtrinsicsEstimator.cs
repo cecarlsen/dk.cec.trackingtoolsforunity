@@ -2,6 +2,8 @@
 	Copyright © Carl Emil Carlsen 2020-2025
 	http://cec.dk
 
+	Finds the intrinsics and relative extrinsics to a camera for a projector using a special calibration board.
+
 	Based on and inspired by the following (but written from scratch).
 
 		Elliot Woods and Kyle McDonald did a workshop in 2011.

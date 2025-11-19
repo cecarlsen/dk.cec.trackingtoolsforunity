@@ -1,9 +1,12 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2018-2024
+	Copyright © Carl Emil Carlsen 2018-2025
 	http://cec.dk
 
+	Given the intrisics of a camera and a set of points in model space and in camera image space we can use Calib3d.solvePnP
+	to find the extrinsics (position and rotation) of the camera relative to the model.
+
 	Trouble shooting
-	- If you get 'Calib3d.solvePnP failed' warnings, then try to add more points. The method does seem to like single points in one dimension.
+	- If you get 'Calib3d.solvePnP failed' warnings, then try to add more points. The method does not seem to like single points in one dimension.
 
 */
 
