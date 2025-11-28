@@ -1,11 +1,12 @@
 /*
-	Copyright © Carl Emil Carlsen 2023
+	Copyright © Carl Emil Carlsen 2023-2025
 	http://cec.dk
 */
 
 using UnityEngine;
 using UnityEngine.Events;
 
+[ExecuteInEditMode]
 public class AspectFromTexture : MonoBehaviour
 {
 	[SerializeField] Texture _texture;
