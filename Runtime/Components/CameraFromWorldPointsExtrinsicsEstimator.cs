@@ -287,7 +287,7 @@ namespace TrackingTools
 
 		void OnDisable()
 		{
-			foreach( var pointRect in _userPointRects ) if( pointRect?.gameObject ) Destroy( pointRect.gameObject );
+			foreach( var pointRect in _userPointRects ) if( pointRect && pointRect.gameObject ) Destroy( pointRect.gameObject );
 			if( _physicalCameraImageUI?.gameObject ) Destroy( _physicalCameraImageUI.gameObject );
 			if( _virtualCameraImageUI?.gameObject ) Destroy( _virtualCameraImageUI.gameObject );
 			if( _aspectFitterUI ) Destroy( _aspectFitterUI );
