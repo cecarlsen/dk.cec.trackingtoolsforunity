@@ -1,5 +1,5 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2018-2025
+	Copyright © Carl Emil Carlsen 2025
 	http://cec.dk
 
 	Given the intrisics of a projector and a set of points in model space and in projector image space we can use Calib3d.solvePnP
@@ -14,6 +14,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using OpenCVForUnity.CoreModule;
+using System;
 
 namespace TrackingTools
 {
@@ -23,9 +24,6 @@ namespace TrackingTools
 		
 		[Header("Input")]
 		[SerializeField] Transform[] _worldPointTransforms = null;
-		//[SerializeField] Texture _physicalCameraTexture = null;
-		//[SerializeField] bool _isPhysicalCameraTextureFlipped = true;
-		//[SerializeField] bool _isPhysicalCameraTextureDistorted = true;
 		[SerializeField] string _projectorIntrinsicsFileName = "DefaultProjector";
 		[SerializeField,Tooltip("Without extension name (which is .json)")] string _calibrationPointsFileName = "DefaultProjectorPoints";
 
@@ -39,7 +37,6 @@ namespace TrackingTools
 		[SerializeField] Font _font = null;
 		[SerializeField] int _fontSize = 12;
 		[SerializeField,Range(0f,1f)] float _virtualAlpha = 0.8f;
-		//[SerializeField,Range(1f,25f)] float _physicalBrightness = 1f;
 		[SerializeField,Tooltip("Optional")] RectTransform _containerUI;
 
 		[Header("Gizmos")]
@@ -49,26 +46,12 @@ namespace TrackingTools
 		[SerializeField] bool _drawPointGizmos = true;
 		[SerializeField] float _pointGizmoRadius = 0.005f;
 
-		//[Header("Other")]
-		//[SerializeField] bool _undistortOnGpu = true;
-
 		ExtrinsicsCalibrator _extrinsicsCalibrator;
 		Intrinsics _intrinsics;
-		//Flipper _flipper;
-		//LensUndistorter _lensUndistorter;
-		//RenderTexture _processedPhysicalCameraTexture;
 		
-		//bool _dirtyTexture = true;
 		bool _dirtyPoints = true;
 		
 		// UI.
-		//RenderTexture _virtualCameraRenderTexture;
-		//Material _uiMaterial;
-		//AspectRatioFitter _aspectFitterUI;
-		//RawImage _virtualCameraImageUI;
-		//RawImage _physicalCameraImageUI;
-		//RectTransform _physicalCameraImageRect;
-		//CanvasGroup _virtualAlphaGroup;
 		RectTransform[] _userPointRects;
 		Image[] _userPointImages;
 		int _focusedPointIndex = -1;
@@ -79,16 +62,6 @@ namespace TrackingTools
 		Point3[] _calibrationPointsWorld;
 		MatOfPoint2f _calibrationPointsImageMat;
 		MatOfPoint3f _calibrationPointsWorldMat;
-
-		// THESE ARE FOR THE ALTERNATIVE CPU-BASED OPENCV UNDISTORTION.
-		//Texture2D _tempTransferTexture; // For conversion from RenderTexture input.
-		//Color32[] _tempTransferColors;
-		//Mat _cameraMatrix;
-		//MatOfDouble _distCoeffs;
-		//Mat _camTexMat;
-		//Mat _camTexGrayMat;
-		//Mat _camTexGrayUndistortMat;
-		//Texture2D _undistortedCameraTexture2D;
 		
 		static readonly Color pointIdleColor = Color.cyan;
 		static readonly Color pointHoverColor = Color.magenta;
@@ -97,20 +70,11 @@ namespace TrackingTools
 		static readonly string logPrepend = "<b>[" + nameof( CameraFromWorldPointsExtrinsicsEstimator ) + "]</b> ";
 
 
-		//public Texture physicalCameraTexture {
-		//	get { return _physicalCameraTexture; }
-		//	set {
-		//		_physicalCameraTexture = value;
-		//		_dirtyTexture = true;
-		//	}
-		//}
-		
 		public bool interactable {
 			get { return _interactable; }
 			set {
 				if( value && !CheckCanCalibrate() ) return;
 				_interactable = value;
-				//if( _physicalCameraImageUI && Application.isPlaying ) _physicalCameraImageUI.gameObject.SetActive( _interactable );
 			}
 		}
 
@@ -119,34 +83,23 @@ namespace TrackingTools
 			set { _virtualAlpha = Mathf.Clamp01( value ); }
 		}
 
-		//public float brightness {
-		//	get { return _physicalBrightness; }
-		//	set {
-		//		_physicalBrightness = value;
-		//		if( _uiMaterial ) _uiMaterial.SetFloat( ShaderIDs._Brightness, _physicalBrightness );
-		//	}
-		//}
-
-		//public bool isPhysicalCameraTextureFlipped {
-		//	get { return _isPhysicalCameraTextureFlipped; }
-		//	set {
-		//		_isPhysicalCameraTextureFlipped = value;
-		//		_dirtyTexture = true;
-		//	}
-		//}
-
-		//public bool isPhysicalCameraTextureDistorted {
-		//	get { return _isPhysicalCameraTextureDistorted; }
-		//	set {
-		//		_isPhysicalCameraTextureDistorted = value;
-		//		_dirtyTexture = true;
-		//	}
-		//}
-
 
 		static class ShaderIDs
 		{
 			public static readonly int _Brightness = Shader.PropertyToID( nameof( _Brightness ) );
+		}
+
+
+		public void OverrideCalibrationPointTransforms( Transform[] transforms )
+		{
+			if( transforms == null ) return;
+			if( Application.isPlaying ){
+				Debug.LogWarning( $"{logPrepend} Ignored OverrideCalibrationPointTransforms(). Only supported in Editor edit mode for now.\n" );
+				return;
+			}
+
+			_worldPointTransforms = new Transform[ transforms.Length ];
+			Array.Copy( transforms, _worldPointTransforms, _worldPointTransforms.Length );
 		}
 
 
@@ -183,7 +136,7 @@ namespace TrackingTools
 		}
 
 
-		void Awake()
+		void OnEnable()
 		{
 			if( _worldPointTransforms == null || _worldPointTransforms.Length < 3 ){
 				Debug.LogWarning( logPrepend + "World points missing. At least three is required.\n" );
@@ -200,20 +153,7 @@ namespace TrackingTools
 				_containerUI = new GameObject( "CameraPoser" ).AddComponent<RectTransform>();
 				_containerUI.transform.SetParent( _canvas.transform );
 			}
-			//_physicalCameraImageUI = new GameObject( "PhysicalCameraImage" ).AddComponent<RawImage>();
-			//_physicalCameraImageUI.transform.SetParent( _containerUI.transform );
-			//_physicalCameraImageUI.rectTransform.FitParent();
-			//_physicalCameraImageRect = _physicalCameraImageUI.GetComponent<RectTransform>();
-			//_virtualCameraImageUI = new GameObject( "VirtualCameraImage" ).AddComponent<RawImage>();
-			//_virtualCameraImageUI.transform.SetParent( _containerUI.transform );
-			//_virtualCameraImageUI.rectTransform.FitParent();
-			//_virtualAlphaGroup = _virtualCameraImageUI.gameObject.AddComponent<CanvasGroup>();
-			//_uiMaterial = new Material( Shader.Find( "UI/ScalarTexture" ) );
-			//_physicalCameraImageUI.material = _uiMaterial;
-			//_aspectFitterUI = _containerUI.gameObject.AddComponent<AspectRatioFitter>();
-			//_aspectFitterUI.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
 			ExpandRectTransform( _containerUI );
-			//ExpandRectTransform( _physicalCameraImageRect );
 			_userPointRects = new RectTransform[pointCount];
 			_userPointImages = new Image[pointCount];
 			for( int p = 0; p < pointCount; p++ )
@@ -238,16 +178,12 @@ namespace TrackingTools
 
 			ResetCalibrationPoints();
 
-			// Hide.
-			//if( !_interactable ) _physicalCameraImageUI.transform.gameObject.SetActive( false );
-
 			// Load files.
 			TryLoadPhysicalCameraIntrinsics();
 			TryLoadCalibrationPoints();
 			
 			// Apply intrinsics.
 			_intrinsics.ApplyToUnityCamera( _projectorCamera );
-			//_aspectFitterUI.aspectRatio = _intrinsics.aspect;
 
 			// Prepare OpenCV.
 			_calibrationPointsImage = new Point[pointCount];
@@ -260,32 +196,21 @@ namespace TrackingTools
 				_calibrationPointsImage[p] = new Point();
 				_calibrationPointsWorld[p] = new Point3();
 			}
-			//_intrinsics.ApplyToToOpenCV( ref _cameraMatrix, ref _distCoeffs );
-
-			// Processing.
-			//_flipper = new Flipper();
 
 			// Update variables.
 			OnValidate();
 		}
 
 
-		void OnDestroy()
+		void OnDisable()
 		{
-			//_virtualCameraRenderTexture?.Release();
+			foreach( var pointRect in _userPointRects ) if( pointRect?.gameObject ) Destroy( pointRect.gameObject );
 			_extrinsicsCalibrator?.Release();
-			//_lensUndistorter?.Release();
-			//_processedPhysicalCameraTexture?.Release();
 			_calibrationPointsImageMat?.Dispose();
 			_calibrationPointsWorldMat?.Dispose();
-			//_flipper?.Release();
 
-			//_distCoeffs?.Dispose();
-			//_cameraMatrix?.Dispose();
-			//_camTexMat?.Dispose();
-			//_camTexGrayMat?.Dispose();
-			//_camTexGrayUndistortMat?.Dispose();
-			//if( _tempTransferTexture ) Destroy( _tempTransferTexture );
+			_isPointActive = false;
+			_focusedPointIndex = -1;
 		}
 
 
@@ -300,53 +225,7 @@ namespace TrackingTools
 				interactable = !interactable;
 			}
 
-			// Adapt resources.
-			//if( _physicalCameraTexture ) AdaptResources();
-
-			if( _interactable )
-			{
-				//if( _dirtyTexture )
-				//{
-					//if( _undistortOnGpu ){
-
-						//if( _isPhysicalCameraTextureDistorted ){
-						//	_lensUndistorter.Undistort( _physicalCameraTexture, _processedPhysicalCameraTexture, _isPhysicalCameraTextureFlipped );
-						//	_flipper.FlipVertically( _processedPhysicalCameraTexture );
-						//} else if( _isPhysicalCameraTextureFlipped ) {
-						//	_flipper.FlipVertically( _physicalCameraTexture, _processedPhysicalCameraTexture );
-						//}
-				//
-						//_physicalCameraImageUI.texture = _isPhysicalCameraTextureFlipped || _isPhysicalCameraTextureDistorted ? _processedPhysicalCameraTexture : _physicalCameraTexture;
-
-						/*
-					} else {
-
-						// WE KEEP THIS HERE SO WE CAN COMPARE THE TWO IMPLEMENTATIONS.
-
-						// Update mat texture ( If the texture looks correct in Unity, then it needs to be flipped for OpenCV ).
-						TrackingToolsHelper.TextureToMat( _physicalCameraTexture, !_isPhysicalCameraTextureFlipped, ref _camTexMat, ref _tempTransferColors, ref _tempTransferTexture );
-
-						// Convert to black & white.
-						TrackingToolsHelper.ColorMatToLumanceMat( _camTexMat, _camTexGrayMat );
-
-						// Undistort.
-						if( _isPhysicalCameraTextureDistorted ) Calib3d.undistort( _camTexGrayMat, _camTexGrayUndistortMat, _cameraMatrix, _distCoeffs );
-
-						// Back to Unity.
-						Utils.fastMatToTexture2D( _isPhysicalCameraTextureDistorted ? _camTexGrayUndistortMat : _camTexGrayMat, _undistortedCameraTexture2D ); // Will flip back to Unity orientation by default.
-
-						_physicalCameraImageUI.texture = _undistortedCameraTexture2D;
-					}
-					*/
-
-					//_dirtyTexture = false;
-				//}
-				UpdateInteraction();
-
-				// UI.
-				//_virtualCameraImageUI.color = new Color( 1f, 1f, 1f, _virtualAlpha );
-				//_virtualAlphaGroup.alpha = _virtualAlpha;
-			}
+			if( _interactable ) UpdateInteraction();
 
 			if( _dirtyPoints )
 			{
@@ -363,9 +242,7 @@ namespace TrackingTools
 		void OnValidate()
 		{
 			interactable = _interactable;
-			//physicalCameraTexture = _physicalCameraTexture;
 			alpha = _virtualAlpha;
-			//brightness = _physicalBrightness;
 
 			_fontSize = Mathf.Max( 0, _fontSize );
 		}
@@ -394,10 +271,6 @@ namespace TrackingTools
 
 		bool CheckCanCalibrate()
 		{
-			//if( !_physicalCameraTexture ){
-			//	Debug.LogWarning( logPrepend + "Missing camera texture.\n" );
-			//	return false;
-			//}
 			if( _intrinsics.width != _projectorCamera.pixelWidth || _intrinsics.height != _projectorCamera.pixelHeight ){
 				Debug.LogWarning( logPrepend + "Intrinsics (" + _intrinsics.width + "x" + _intrinsics.height + ") and Physical Camera Texture (" + _projectorCamera.pixelWidth + "x" + _projectorCamera.pixelHeight + ") sizes must match.\n" );
 				return false;
@@ -405,34 +278,6 @@ namespace TrackingTools
 			return true;
 		}
 
-
-		void AdaptResources()
-		{
-			//int w = _projectorCamera.pixelWidth;
-			//int h = _projectorCamera.pixelHeight;
-			//if( _isPhysicalCameraTextureDistorted && ( _processedPhysicalCameraTexture == null || _processedPhysicalCameraTexture.width != w || _processedPhysicalCameraTexture.height != h ) ){
-			//	_processedPhysicalCameraTexture?.Release();
-			//	_processedPhysicalCameraTexture = new RenderTexture( w, h, 0, _physicalCameraTexture.graphicsFormat );
-			//	_processedPhysicalCameraTexture.name = "PhysicalCameraTexture";
-			//}
-
-			//if( _lensUndistorter == null ) _lensUndistorter = new LensUndistorter( _intrinsics );
-
-			//if( !_virtualCameraRenderTexture || _virtualCameraRenderTexture.width != w || _virtualCameraRenderTexture.height != h ){
-			//	if( _virtualCameraRenderTexture ) _virtualCameraRenderTexture.Release();
-			//	_virtualCameraRenderTexture = new RenderTexture( w, h, 16 );
-			//	_virtualCameraRenderTexture.name = "VirtualCameraTexture";
-			//	_projectorCamera.targetTexture = _virtualCameraRenderTexture;
-			//	_virtualCameraImageUI.texture = _virtualCameraRenderTexture;
-//
-			//	// OPEN CV ALTERNATIVE.
-			//	//_camTexMat = TrackingToolsHelper.GetCompatibleMat( _physicalCameraTexture );
-			//	//_camTexGrayMat = new Mat( h, w, CvType.CV_8UC1 );
-			//	//_camTexGrayUndistortMat = new Mat( h, w, CvType.CV_8UC1 );
-			//	//_undistortedCameraTexture2D = new Texture2D( w, h, GraphicsFormat.R8_UNorm, 0, TextureCreationFlags.None );
-			//	//_undistortedCameraTexture2D.name = "UndistortedCameraTex";
-			//}
-		}
 
 
 		void UpdateInteraction()
@@ -446,7 +291,6 @@ namespace TrackingTools
 
 			// Get anchored mouse position withint image rect.
 			Vector2 mousePos = Input.mousePosition;
-			Debug.Log( Input.mousePosition );
 			var canvasRectTransform = _canvas.GetComponent<RectTransform>();
 			RectTransformUtility.ScreenPointToLocalPointInRectangle( canvasRectTransform, mousePos, _canvas.worldCamera, out mousePos );
 			mousePos = LocalPixelPositionToAnchoredPosition( mousePos, canvasRectTransform );
@@ -509,8 +353,6 @@ namespace TrackingTools
 			}
 			_calibrationPointsImageMat.fromArray( _calibrationPointsImage );
 			_calibrationPointsWorldMat.fromArray( _calibrationPointsWorld );
-
-			//Debug.Log( _calibrationPointsWorldMat.dump() );
 
 			_extrinsicsCalibrator.UpdateExtrinsics( _calibrationPointsWorldMat, _calibrationPointsImageMat, _intrinsics );
 			

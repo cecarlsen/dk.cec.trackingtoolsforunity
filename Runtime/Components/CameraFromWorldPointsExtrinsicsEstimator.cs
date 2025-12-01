@@ -14,6 +14,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using OpenCVForUnity.CoreModule;
+using System;
 
 namespace TrackingTools
 {
@@ -94,7 +95,7 @@ namespace TrackingTools
 		static readonly Color pointHoverColor = Color.magenta;
 		static readonly Color pointActiveColor = Color.white;
 
-		static readonly string logPrepend = "<b>[" + nameof( CameraFromWorldPointsExtrinsicsEstimator ) + "]</b> ";
+		static readonly string logPrepend = $"<b>[{nameof( CameraFromWorldPointsExtrinsicsEstimator )}]</b>";
 
 
 		public Texture physicalCameraTexture {
@@ -150,6 +151,19 @@ namespace TrackingTools
 		}
 
 
+		public void OverrideCalibrationPointTransforms( Transform[] transforms )
+		{
+			if( transforms == null ) return;
+			if( Application.isPlaying ){
+				Debug.LogWarning( $"{logPrepend} Ignored OverrideCalibrationPointTransforms(). Only supported in Editor edit mode for now.\n" );
+				return;
+			}
+
+			_worldPointTransforms = new Transform[ transforms.Length ];
+			Array.Copy( transforms, _worldPointTransforms, _worldPointTransforms.Length );
+		}
+
+
 		/// <summary>
 		/// Reset calibration points to fit current camera perspective.
 		/// </summary>
@@ -183,7 +197,7 @@ namespace TrackingTools
 		}
 
 
-		void Awake()
+		void OnEnable()
 		{
 			if( _worldPointTransforms == null || _worldPointTransforms.Length < 3 ){
 				Debug.LogWarning( logPrepend + "World points missing. At least three is required.\n" );
@@ -210,7 +224,8 @@ namespace TrackingTools
 			_virtualAlphaGroup = _virtualCameraImageUI.gameObject.AddComponent<CanvasGroup>();
 			_uiMaterial = new Material( Shader.Find( "UI/ScalarTexture" ) );
 			_physicalCameraImageUI.material = _uiMaterial;
-			_aspectFitterUI = _containerUI.gameObject.AddComponent<AspectRatioFitter>();
+			_aspectFitterUI = _containerUI.gameObject.GetComponent<AspectRatioFitter>();
+			if( !_aspectFitterUI ) _aspectFitterUI = _containerUI.gameObject.AddComponent<AspectRatioFitter>();
 			_aspectFitterUI.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
 			ExpandRectTransform( _containerUI );
 			ExpandRectTransform( _physicalCameraImageRect );
@@ -270,8 +285,16 @@ namespace TrackingTools
 		}
 
 
-		void OnDestroy()
+		void OnDisable()
 		{
+			foreach( var pointRect in _userPointRects ) if( pointRect?.gameObject ) Destroy( pointRect.gameObject );
+			if( _physicalCameraImageUI?.gameObject ) Destroy( _physicalCameraImageUI.gameObject );
+			if( _virtualCameraImageUI?.gameObject ) Destroy( _virtualCameraImageUI.gameObject );
+			if( _aspectFitterUI ) Destroy( _aspectFitterUI );
+			_physicalCameraImageUI = null;
+			_virtualCameraImageUI = null;
+			_aspectFitterUI = null;
+
 			_virtualCameraRenderTexture?.Release();
 			_extrinsicsCalibrator?.Release();
 			_lensUndistorter?.Release();
@@ -279,6 +302,16 @@ namespace TrackingTools
 			_calibrationPointsImageMat?.Dispose();
 			_calibrationPointsWorldMat?.Dispose();
 			_flipper?.Release();
+			_virtualCameraRenderTexture = null;
+			_extrinsicsCalibrator = null;
+			_lensUndistorter = null;
+			_processedPhysicalCameraTexture = null;
+			_calibrationPointsImageMat = null;
+			_calibrationPointsWorldMat = null;
+			_flipper = null;
+
+			_isPointActive = false;
+			_focusedPointIndex = -1;
 
 			//_distCoeffs?.Dispose();
 			//_cameraMatrix?.Dispose();
@@ -395,11 +428,11 @@ namespace TrackingTools
 		bool CheckCanCalibrate()
 		{
 			if( !_physicalCameraTexture ){
-				Debug.LogWarning( logPrepend + "Missing camera texture.\n" );
+				Debug.LogWarning( $"{logPrepend} Missing camera texture.\n" );
 				return false;
 			}
 			if( _intrinsics.width != _physicalCameraTexture.width || _intrinsics.height !=_physicalCameraTexture.height ){
-				Debug.LogWarning( logPrepend + "Intrinsics (" + _intrinsics.width + "x" + _intrinsics.height + ") and Physical Camera Texture (" + _physicalCameraTexture.width + "x" + _physicalCameraTexture.height + ") sizes must match.\n" );
+				Debug.LogWarning( $"{logPrepend} Intrinsics ({_intrinsics.width}x{_intrinsics.height}) and Physical Camera Texture ({_physicalCameraTexture.width}x{_physicalCameraTexture.height}) sizes must match.\n" );
 				return false;
 			}
 			return true;

@@ -1,6 +1,11 @@
 # Changelog
 
 
+## [0.1.10] 2025-12-01
+
+- Added ProjectorFromWorldPointsExtrinsicsEstimator.
+
+
 ## [0.1.9] 2024-02-26
 
 - Added additional frame history getter options to CameraTextureProvider.

@@ -45,7 +45,7 @@ namespace TrackingTools
 	/// <summary>
 	/// Estimates intrinsics and extriniscs of a video projector relative to a camera with known intrinsics.
 	/// </summary>
-	public class ProjectorFromCameraExtrinsicsEstimator : MonoBehaviour
+	public class ProjectorFromCameraIntrinsicsExtrinsicsEstimator : MonoBehaviour
 	{
 		[ Header("Input")]
 		[SerializeField] Texture _cameraSourceTexture = null;
@@ -167,7 +167,7 @@ namespace TrackingTools
 		const int stableFrameCountThresholdForTimedSampling = 20;
 		const int stableFrameCountThresholdForManualSampling = 5;
 
-		static readonly string logPrepend = "<b>[" + nameof( ProjectorFromCameraExtrinsicsEstimator ) + "]</b>";
+		static readonly string logPrepend = "<b>[" + nameof( ProjectorFromCameraIntrinsicsExtrinsicsEstimator ) + "]</b>";
 
 
 		public Texture cameraSourceTexture {
