@@ -77,81 +77,67 @@ namespace TrackingTools
 		[Header("Debug")]
 		[SerializeField] bool _showDotGizmos = false;
 
+		// State.
+		State _state = State.Initiating;
+		bool _dirtyTexture;
+		bool _manualCirclePatternTransformationRequested = true;
+
+		// Calibrators.
 		Intrinsics _cameraIntrinsics;
 		ExtrinsicsCalibrator _cameraExtrinsicsCalibrator;
 		IntrinsicsCalibrator _projectorIntrinsicsCalibrator;
 		StereoExtrinsicsCalibrator _stereoExtrinsicsCalibrator;
 
-		State _state = State.Initiating;
-
+		// OpenCV.
 		Mat _camTexMat;
 		Mat _camTexGrayMat;
 		Mat _camTexGrayUndistortMat;
 		Mat _camTexGrayUndistortInvMat;
-		Texture2D _processedCameraTexture;
-
-		Color32[] _tempTransferColors;
-		Texture2D _tempTransferTexture;
-
-		RenderTexture _arTexture;
-
 		Mat _sensorMat;
 		MatOfDouble _distortionCoeffsMat;
 		MatOfDouble _noDistCoeffs;
-
 		MatOfPoint2f _chessPatternImagePoints;
 		MatOfPoint3f _chessPatternWorldPoints;
-
 		MatOfPoint2f _circlePatternProjectorRenderImagePoints;
 		MatOfPoint3f _circlePatternRenderedWorldPoints;
 		MatOfPoint2f _circlePatternCameraImagePoints;
 		MatOfPoint3f _circlePatternRealModelPoints;
 		MatOfPoint3f _circlePatternDetectedWorldPoints;
-
 		Mat _undistortMap1;
 		Mat _undistortMap2;
 
-		bool _dirtyTexture;
-
-		RenderTexture _chessPatternTexture;
-		RenderTexture _circlePatternTexture;
-
+		// UI.
 		MaterialPropFlasher _previewFlasher;
 		RawImage _arImage;
 		AspectRatioFitter _cameraAspectFitter;
-
-		Material _previewMaterial;
-		Material _circlePatternBoardMaterial;
-		Material _screenBorderMaterial;
-		Material _patternRenderMaterial;
-
 		Transform _calibrationBoardTransform;
 		Transform _chessPatternTransform;
 		Transform _circlePatternTransform;
 		GameObject _precisionDotsContainerObject;
 		Transform _projectorSampleMeterTransform;
 
-		//float _circleChessOffset;
+		// Unity.
+		Texture2D _processedCameraTexture;
+		Texture2D _tempTransferTexture;
+		Color32[] _tempTransferColors;
+		RenderTexture _arTexture;
+		RenderTexture _chessPatternTexture;
+		RenderTexture _circlePatternTexture;
+		Material _previewMaterial;
+		Material _circlePatternBoardMaterial;
+		Material _patternRenderMaterial;
 
+		// Data.
 		Plane _calibrationboardPlane;
-
 		Vector2 _circlePatternBorderSizeUV;
-
 		Matrix4x4 _circlePatternToWorldPrevFrame;
 		Matrix4x4 _chessPatternToWorldPrevFrame;
-
 		Vector2Int _circlePatternSize;
 		int _stableFrameCount;
 		int _circlePatternPointCount;
-
 		float _extrinsicsErrorAvgM; // in meters
-
 		int _stableSampleCountThreshold;
 		bool _sampleManuallyRequested;
-
-		bool _manualCirclePatternTransformationRequested = true;
-
-
 		StringBuilder _sb;
 
 		static Vector3[] edgeCornersNormalized = {
@@ -199,10 +185,8 @@ namespace TrackingTools
 
 
 
-		void Awake()
+		void OnEnable()
 		{
-			Application.targetFrameRate = 30;
-
 			// Check resources.
 			if( _operationMode == OperationMode.ManualSamlping && !_manualSampleButton ) {
 				Debug.LogError( logPrepend + "Missing sample button. You must provide a sample button when OperationMode is " + OperationMode.ManualSamlping );
@@ -231,9 +215,11 @@ namespace TrackingTools
 				_manualSampleButton.interactable = false;
 			}
 
-			// Prepare OpenCV.
+			// Calibrators.
 			_cameraExtrinsicsCalibrator = new ExtrinsicsCalibrator();
 			_stereoExtrinsicsCalibrator = new StereoExtrinsicsCalibrator();
+
+			// Prepare OpenCV.
 			_noDistCoeffs = new MatOfDouble( new double[] { 0, 0, 0, 0 } );
 			_circlePatternProjectorRenderImagePoints = new MatOfPoint2f();
 			_circlePatternRealModelPoints = new MatOfPoint3f();
@@ -314,8 +300,6 @@ namespace TrackingTools
 			_saveButton.gameObject.SetActive( false );
 			_undoSampleButton.gameObject.SetActive( false );
 
-			_screenBorderMaterial = new Material( unlitColorShader );
-
 			_circlePatternToWorldPrevFrame = Matrix4x4.identity;
 
 			_previewFlasher = new MaterialPropFlasher( _previewMaterial, "_Whiteout", TrackingToolsConstants.flashDuration );
@@ -333,8 +317,18 @@ namespace TrackingTools
 		}
 
 
-		void OnDestroy()
+		void OnDisable()
 		{
+			// Calibrators.
+			_projectorIntrinsicsCalibrator?.Release();;
+			_cameraExtrinsicsCalibrator?.Release();
+			_stereoExtrinsicsCalibrator?.Release();
+			_projectorIntrinsicsCalibrator = null;
+			_cameraExtrinsicsCalibrator = null;
+			_stereoExtrinsicsCalibrator = null;
+			_cameraIntrinsics = null;
+
+			// OpenCV.
 			_camTexMat?.release();
 			_camTexGrayMat?.release();
 			_camTexGrayUndistortMat?.release();
@@ -342,16 +336,67 @@ namespace TrackingTools
 			_sensorMat?.release();
 			_distortionCoeffsMat?.release();
 			_noDistCoeffs?.release();
-			_arTexture?.Release();
-			if( _previewMaterial ) Destroy( _previewMaterial );
-			if( _chessPatternTransform ) Destroy( _chessPatternTransform.gameObject );
-			_chessPatternTexture?.Release();
-			_chessPatternTexture?.Release();
-			_projectorIntrinsicsCalibrator?.Clear();
-			_cameraExtrinsicsCalibrator?.Release();
-			if( _screenBorderMaterial != null ) Destroy( _screenBorderMaterial );
+			_chessPatternImagePoints?.release();
+			_chessPatternWorldPoints?.release();
+			_circlePatternProjectorRenderImagePoints?.release();
+			_circlePatternRenderedWorldPoints?.release();
+			_circlePatternCameraImagePoints?.release();
+			_circlePatternRealModelPoints?.release();
+			_circlePatternDetectedWorldPoints?.release();
 			_undistortMap1?.release();
 			_undistortMap2?.release();
+			_camTexMat = null;
+			_camTexGrayMat = null;
+			_camTexGrayUndistortMat = null;
+			_camTexGrayUndistortInvMat = null;
+			_sensorMat = null;;
+			_distortionCoeffsMat = null;
+			_noDistCoeffs = null;
+			_chessPatternImagePoints = null;
+			_chessPatternWorldPoints = null;
+			_circlePatternProjectorRenderImagePoints = null;
+			_circlePatternRenderedWorldPoints = null;
+			_circlePatternCameraImagePoints = null;
+			_circlePatternRealModelPoints = null;
+			_circlePatternDetectedWorldPoints = null;
+			_undistortMap1 = null;
+			_undistortMap2 = null;
+
+			// UI.
+			if( _arImage && _arImage.gameObject ) Destroy( _arImage.gameObject );
+			if( _cameraAspectFitter ) Destroy( _cameraAspectFitter );
+			if( _calibrationBoardTransform && _calibrationBoardTransform.gameObject ) Destroy( _calibrationBoardTransform.gameObject );
+			if( _chessPatternTransform && _chessPatternTransform.gameObject ) Destroy( _chessPatternTransform.gameObject );
+			if( _circlePatternTransform && _circlePatternTransform.gameObject ) Destroy( _circlePatternTransform.gameObject );
+			if( _precisionDotsContainerObject ) Destroy( _precisionDotsContainerObject );
+			if( _projectorSampleMeterTransform && _projectorSampleMeterTransform.gameObject ) Destroy( _projectorSampleMeterTransform.gameObject );
+			_arImage = null;
+			_cameraAspectFitter = null;
+			_calibrationBoardTransform = null;
+			_chessPatternTransform = null;
+			_circlePatternTransform = null;
+			_precisionDotsContainerObject = null;
+			_projectorSampleMeterTransform = null;
+			_previewFlasher = null;
+
+			// Unity.
+			if( _processedCameraTexture ) Destroy( _processedCameraTexture );
+			if( _tempTransferTexture ) Destroy( _tempTransferTexture );
+			_arTexture?.Release();
+			_chessPatternTexture?.Release();
+			_circlePatternTexture?.Release();
+			if( _previewMaterial ) Destroy( _previewMaterial );
+			if( _circlePatternBoardMaterial ) Destroy( _circlePatternBoardMaterial );
+			if( _patternRenderMaterial ) Destroy( _patternRenderMaterial );
+			_processedCameraTexture = null;
+			_tempTransferTexture = null;
+			_arTexture = null;
+			_chessPatternTexture = null;
+			_circlePatternTexture = null;
+			_previewMaterial = null;
+			_circlePatternBoardMaterial = null;
+			_patternRenderMaterial = null;
+			_tempTransferColors = null;
 		}
 
 
@@ -439,27 +484,6 @@ namespace TrackingTools
 			// Done.
 			_dirtyTexture = false;
 		}
-
-
-		/*
-		// This does not work in URP =(
-		void OnRenderObject()
-		{
-			Camera cam = Camera.current;
-			if( cam.targetDisplay != 1 ) return;
-
-			// Draw 1px border on projection.
-			_screenBorderMaterial.SetPass( 0 );
-			GL.LoadPixelMatrix();
-			GL.Begin( GL.LINE_STRIP );
-			GL.Vertex3( 1, 1, 0 );
-			GL.Vertex3( cam.pixelWidth-1, 0, 0 );
-			GL.Vertex3( cam.pixelWidth-1, cam.pixelHeight-1, 0 );
-			GL.Vertex3( 1, cam.pixelHeight-1, 0 );
-			GL.Vertex3( 1, 1, 0 );
-			GL.End();
-		}
-		*/
 
 
 		bool AdaptResources()
@@ -788,10 +812,11 @@ namespace TrackingTools
 			const float relScaleYMin = 0.3f;
 			float relScaleY = Mathf.Lerp( relScaleYMin, relScaleYMax, scaleT );
 
+			Vector2 lensShift = _projectorCamera.lensShift;
 			float viewHeight = _circlePatternTransform.localScale.y / relScaleY;
 			float dist = ( viewHeight * 0.5f ) / Mathf.Tan( _projectorCamera.fieldOfView * 0.5f * Mathf.Deg2Rad );
-			float xOff = ( xOffT - 0.5f ) * ( viewHeight * _projectorCamera.aspect - _circlePatternTransform.localScale.x );
-			float yOff = ( yOffT - 0.5f ) * ( viewHeight - _circlePatternTransform.localScale.y );
+			float xOff = ( xOffT - 0.5f ) * ( viewHeight * _projectorCamera.aspect - _circlePatternTransform.localScale.x ) + viewHeight * lensShift.x;
+			float yOff = ( yOffT - 0.5f ) * ( viewHeight - _circlePatternTransform.localScale.y ) +  viewHeight * lensShift.y;
 
 			_circlePatternTransform.position = 
 				_projectorCamera.transform.position +
@@ -811,12 +836,17 @@ namespace TrackingTools
 
 		void SaveToFiles()
 		{
-			string intrinsicsFileName = _projectorIntrinsicsFileName;
-			if( _addErrorValueToIntrinsicsFileName ) intrinsicsFileName += "_E-" + _projectorIntrinsicsCalibrator.rmsError.ToString( "F02" ).Replace( ".", "," );
-			string intrinsicsFilePath = _projectorIntrinsicsCalibrator.intrinsics.SaveToFile( intrinsicsFileName );
-			string extrinsicsFilePath = _stereoExtrinsicsCalibrator.extrinsics.SaveToFile( _projectorExtrinsicsFileName );
-
-			Debug.Log( $"{logPrepend} Saved files {intrinsicsFilePath}\n{extrinsicsFilePath}" );
+			if( !string.IsNullOrEmpty( _projectorIntrinsicsFileName ) ){
+				string intrinsicsFileName = _projectorIntrinsicsFileName;
+				if( _addErrorValueToIntrinsicsFileName ) intrinsicsFileName += "_E-" + _projectorIntrinsicsCalibrator.rmsError.ToString( "F02" ).Replace( ".", "," );
+				string intrinsicsFilePath = _projectorIntrinsicsCalibrator.intrinsics.SaveToFile( intrinsicsFileName );
+				Debug.Log( $"{logPrepend} Saved intrinsics at: {intrinsicsFilePath}\n" );
+			}
+			if( !string.IsNullOrEmpty( _projectorExtrinsicsFileName ) )
+			{
+				string extrinsicsFilePath = _stereoExtrinsicsCalibrator.extrinsics.SaveToFile( _projectorExtrinsicsFileName );
+				Debug.Log( $"{logPrepend} Saved extrinsics at: {extrinsicsFilePath}\n" );
+			}
 
 			SwitchState( State.Testing );
 		}

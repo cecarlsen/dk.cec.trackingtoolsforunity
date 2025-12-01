@@ -345,7 +345,7 @@ namespace TrackingTools
 			if( _camTexGrayMat != null ) _camTexGrayMat.Dispose();
 			if( _camTexGrayUndistortMat != null ) _camTexGrayUndistortMat.Dispose();
 			if( _processedCameraTexture ) Destroy( _processedCameraTexture );
-			if( _intrinsicsCalibrator != null ) _intrinsicsCalibrator.Clear();
+			if( _intrinsicsCalibrator != null ) _intrinsicsCalibrator.Release();
 
 			_stableFrameCount = 0;
 			_successFrameCount = 0;

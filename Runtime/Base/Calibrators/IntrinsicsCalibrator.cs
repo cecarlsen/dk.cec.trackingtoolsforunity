@@ -109,7 +109,7 @@ namespace TrackingTools
 		}
 
 
-		public void Clear()
+		public void Release()
 		{
 			foreach( Mat mat in _patternImageSamples ) mat.release();
 			foreach( Mat mat in _patternRealSamples ) mat.release();
