@@ -1,6 +1,11 @@
 # Changelog
 
 
+## [0.1.11] 2025-12-05
+
+- Update to the new Input System.
+
+
 ## [0.1.10] 2025-12-01
 
 - Added ProjectorFromWorldPointsExtrinsicsEstimator.

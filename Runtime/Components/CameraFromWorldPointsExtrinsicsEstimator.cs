@@ -13,6 +13,7 @@
 using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.InputSystem;
 using OpenCVForUnity.CoreModule;
 using System;
 
@@ -34,14 +35,14 @@ namespace TrackingTools
 		[SerializeField] Camera _virtualCamera = null;
 
 		[Header("UI")]
-		[SerializeField] Canvas _canvas = null;
-		[SerializeField] KeyCode _interactableHotKey = KeyCode.Alpha1;
-		[SerializeField] KeyCode _resetHotKey = KeyCode.Backspace;
+		[SerializeField] RectTransform _containerRect = null;
+		[SerializeField] Key _interactableHotKey = Key.Digit1;
+		[SerializeField] Key _resetHotKey = Key.Backspace;
 		[SerializeField] Font _font = null;
 		[SerializeField] int _fontSize = 12;
 		[SerializeField,Range(0f,1f)] float _virtualAlpha = 0.8f;
 		[SerializeField,Range(1f,25f)] float _physicalBrightness = 1f;
-		[SerializeField,Tooltip("Optional")] RectTransform _containerUI;
+		//[SerializeField,Tooltip("Optional")] RectTransform _containerUI;
 
 		[Header("Gizmos")]
 		[SerializeField] bool _drawGizmosAlways = true;
@@ -60,7 +61,8 @@ namespace TrackingTools
 		RenderTexture _processedPhysicalCameraTexture;
 		
 		bool _dirtyTexture = true;
-		bool _dirtyPoints = true;
+		bool _needsResetImageCalibrationPoints = false;
+		bool _dirtyCalibration = true;
 		
 		// UI.
 		RenderTexture _virtualCameraRenderTexture;
@@ -94,6 +96,7 @@ namespace TrackingTools
 		static readonly Color pointIdleColor = Color.cyan;
 		static readonly Color pointHoverColor = Color.magenta;
 		static readonly Color pointActiveColor = Color.white;
+		const int worldPointTransformCountMin = 4;
 
 		static readonly string logPrepend = $"<b>[{nameof( CameraFromWorldPointsExtrinsicsEstimator )}]</b>";
 
@@ -144,6 +147,8 @@ namespace TrackingTools
 			}
 		}
 
+		public Camera virtualCamera => _virtualCamera;
+
 
 		static class ShaderIDs
 		{
@@ -151,29 +156,39 @@ namespace TrackingTools
 		}
 
 
-		public void OverrideCalibrationPointTransforms( Transform[] transforms )
+		public void SetWorldPointTransforms( Transform[] transforms )
 		{
-			if( transforms == null ) return;
-			if( Application.isPlaying ){
-				Debug.LogWarning( $"{logPrepend} Ignored OverrideCalibrationPointTransforms(). Only supported in Editor edit mode for now.\n" );
+			if( transforms == null ){
+				Debug.LogWarning( $"{logPrepend} Ignored SetWorldPointTransforms(). The transforms array is null.\n" );
+				return;
+			}
+
+			if( transforms.Length < worldPointTransformCountMin ){
+				Debug.LogWarning( $"{logPrepend} Ignored SetWorldPointTransforms(). You must supply at least {worldPointTransformCountMin} transforms.\n" );
 				return;
 			}
 
 			_worldPointTransforms = new Transform[ transforms.Length ];
 			Array.Copy( transforms, _worldPointTransforms, _worldPointTransforms.Length );
+
+			AdaptWorldPointTransformResources();
+			_needsResetImageCalibrationPoints = true;
+			_dirtyCalibration = true;
 		}
 
 
 		/// <summary>
-		/// Reset calibration points to fit current camera perspective.
+		/// /// Reset calibration points to fit current camera perspective.
 		/// </summary>
-		public void ResetCalibrationPoints()
+		public void ResetImageCalibrationPoints()
 		{
 			int pointCount = _worldPointTransforms.Length;
 			for( int p = 0; p < pointCount; p++ ) {
 				Vector2 viewportPoint = _virtualCamera.WorldToViewportPoint( _worldPointTransforms[ p ].position );
 				SetAnchoredPosition( _userPointRects[ p ], viewportPoint );
 			}
+			_dirtyCalibration = true;
+			_needsResetImageCalibrationPoints = false;
 		}
 
 
@@ -188,7 +203,7 @@ namespace TrackingTools
 
 
 		/// <summary>
-		/// Set calibration point file name without extention.
+		/// Set calibration point file name without extention. You must first make sure that WorldPointTransforms are set with matching count.
 		/// </summary>
 		public void SetCalibrationPointFileName( string calibrationPointsFileName )
 		{
@@ -199,83 +214,44 @@ namespace TrackingTools
 
 		void OnEnable()
 		{
-			if( _worldPointTransforms == null || _worldPointTransforms.Length < 3 ){
-				Debug.LogWarning( logPrepend + "World points missing. At least three is required.\n" );
-				enabled = false;
-				return;
-			}
-
-			int pointCount = _worldPointTransforms.Length;
+			//if( _worldPointTransforms == null || _worldPointTransforms.Length < worldPointTransformCountMin ){
+			//	Debug.LogWarning( $"{logPrepend} World points missing. At least {worldPointTransformCountMin} are required.\n" );
+			//	enabled = false;
+			//	return;
+			//}
 
 			_extrinsicsCalibrator = new ExtrinsicsCalibrator();
 
 			// Create UI.
-			if( !_containerUI ) {
-				_containerUI = new GameObject( "CameraPoser" ).AddComponent<RectTransform>();
-				_containerUI.transform.SetParent( _canvas.transform );
-			}
+			//if( !_containerUI ) {
+			//	_containerUI = new GameObject( "CameraPoser" ).AddComponent<RectTransform>();
+			//	_containerUI.transform.SetParent( _containerRect );
+			//}
 			_physicalCameraImageUI = new GameObject( "PhysicalCameraImage" ).AddComponent<RawImage>();
-			_physicalCameraImageUI.transform.SetParent( _containerUI.transform );
+			_physicalCameraImageUI.transform.SetParent( _containerRect );
 			_physicalCameraImageUI.rectTransform.FitParent();
 			_physicalCameraImageRect = _physicalCameraImageUI.GetComponent<RectTransform>();
 			_virtualCameraImageUI = new GameObject( "VirtualCameraImage" ).AddComponent<RawImage>();
-			_virtualCameraImageUI.transform.SetParent( _containerUI.transform );
+			_virtualCameraImageUI.transform.SetParent( _containerRect );
 			_virtualCameraImageUI.rectTransform.FitParent();
 			_virtualAlphaGroup = _virtualCameraImageUI.gameObject.AddComponent<CanvasGroup>();
 			_uiMaterial = new Material( Shader.Find( "UI/ScalarTexture" ) );
 			_physicalCameraImageUI.material = _uiMaterial;
-			_aspectFitterUI = _containerUI.gameObject.GetComponent<AspectRatioFitter>();
-			if( !_aspectFitterUI ) _aspectFitterUI = _containerUI.gameObject.AddComponent<AspectRatioFitter>();
+			_aspectFitterUI = _containerRect.gameObject.GetComponent<AspectRatioFitter>();
+			if( !_aspectFitterUI ) _aspectFitterUI = _containerRect.gameObject.AddComponent<AspectRatioFitter>();
 			_aspectFitterUI.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
-			ExpandRectTransform( _containerUI );
+			//ExpandRectTransform( _containerRect );
 			ExpandRectTransform( _physicalCameraImageRect );
-			_userPointRects = new RectTransform[pointCount];
-			_userPointImages = new Image[pointCount];
-			for( int p = 0; p < pointCount; p++ )
-			{
-				GameObject pointObject = new GameObject( "Point" + p );
-				pointObject.transform.SetParent( _containerUI );
-				Image pointImage = pointObject.AddComponent<Image>();
-				pointImage.color = Color.cyan;
-				RectTransform pointRect = pointObject.GetComponent<RectTransform>();
-				pointRect.sizeDelta = Vector2.one * 5;
-				pointRect.anchoredPosition = Vector3.zero;
-				Text pointLabel = new GameObject( "Label" ).AddComponent<Text>();
-				pointLabel.text = p.ToString();
-				pointLabel.transform.SetParent( pointRect );
-				pointLabel.rectTransform.anchoredPosition = Vector2.zero;
-				pointLabel.rectTransform.sizeDelta = new Vector2( _fontSize, _fontSize ) * 2;
-				pointLabel.font = _font;
-				pointLabel.fontSize = _fontSize;
-				_userPointRects[p] = pointRect;
-				_userPointImages[p] = pointImage;
-			}
 
-			ResetCalibrationPoints();
+			// Adapt world point transform resources (if any).
+			AdaptWorldPointTransformResources();
 
 			// Hide.
 			if( !_interactable ) _physicalCameraImageUI.transform.gameObject.SetActive( false );
 
 			// Load files.
 			TryLoadPhysicalCameraIntrinsics();
-			TryLoadCalibrationPoints();
-			
-			// Apply intrinsics.
-			_intrinsics.ApplyToUnityCamera( _virtualCamera );
-			_aspectFitterUI.aspectRatio = _intrinsics.aspect;
-
-			// Prepare OpenCV.
-			_calibrationPointsImage = new Point[pointCount];
-			_calibrationPointsWorld = new Point3[pointCount];
-			_calibrationPointsImageMat = new MatOfPoint2f();
-			_calibrationPointsWorldMat = new MatOfPoint3f();
-			_calibrationPointsImageMat.alloc( pointCount );
-			_calibrationPointsWorldMat.alloc( pointCount );
-			for( int p = 0; p < pointCount; p++ ) {
-				_calibrationPointsImage[p] = new Point();
-				_calibrationPointsWorld[p] = new Point3();
-			}
-			//_intrinsics.ApplyToToOpenCV( ref _cameraMatrix, ref _distCoeffs );
+			if( !TryLoadCalibrationPoints() ) ResetImageCalibrationPoints();
 
 			// Processing.
 			_flipper = new Flipper();
@@ -285,30 +261,31 @@ namespace TrackingTools
 		}
 
 
+		
+
+
 		void OnDisable()
 		{
-			foreach( var pointRect in _userPointRects ) if( pointRect && pointRect.gameObject ) Destroy( pointRect.gameObject );
-			if( _physicalCameraImageUI?.gameObject ) Destroy( _physicalCameraImageUI.gameObject );
-			if( _virtualCameraImageUI?.gameObject ) Destroy( _virtualCameraImageUI.gameObject );
+			ReleaseWorldPointTransformResources();
+
+			if( _physicalCameraImageUI != null && _physicalCameraImageUI.gameObject ) Destroy( _physicalCameraImageUI.gameObject );
+			if( _virtualCameraImageUI != null && _virtualCameraImageUI.gameObject ) Destroy( _virtualCameraImageUI.gameObject );
 			if( _aspectFitterUI ) Destroy( _aspectFitterUI );
 			_physicalCameraImageUI = null;
 			_virtualCameraImageUI = null;
 			_aspectFitterUI = null;
 
-			_virtualCameraRenderTexture?.Release();
 			_extrinsicsCalibrator?.Release();
 			_lensUndistorter?.Release();
-			_processedPhysicalCameraTexture?.Release();
-			_calibrationPointsImageMat?.Dispose();
-			_calibrationPointsWorldMat?.Dispose();
 			_flipper?.Release();
-			_virtualCameraRenderTexture = null;
 			_extrinsicsCalibrator = null;
 			_lensUndistorter = null;
-			_processedPhysicalCameraTexture = null;
-			_calibrationPointsImageMat = null;
-			_calibrationPointsWorldMat = null;
 			_flipper = null;
+
+			_virtualCameraRenderTexture?.Release();
+			_processedPhysicalCameraTexture?.Release();
+			_virtualCameraRenderTexture = null;
+			_processedPhysicalCameraTexture = null;
 
 			_isPointActive = false;
 			_focusedPointIndex = -1;
@@ -322,19 +299,22 @@ namespace TrackingTools
 		}
 
 
+
+
 		void Update()
 		{
-			// Need intrinsics in all cases.
+			// Check basic needs.
 			if( _intrinsics == null ) return;
 			
 			// Only allow calibration if we have a physical camera source texture.
-			if( Input.GetKeyDown( _interactableHotKey ) ){
+			if( Keyboard.current[ _interactableHotKey ].wasReleasedThisFrame ){
 				if( !interactable && !CheckCanCalibrate() ) return;
 				interactable = !interactable;
 			}
 
 			// Adapt resources.
-			if( _physicalCameraTexture ) AdaptResources();
+			AutoAdaptTextureResources();
+			if( _needsResetImageCalibrationPoints ) ResetImageCalibrationPoints();
 
 			if( _interactable )
 			{
@@ -381,11 +361,7 @@ namespace TrackingTools
 				_virtualAlphaGroup.alpha = _virtualAlpha;
 			}
 
-			if( _dirtyPoints )
-			{
-				UpdateCameraTransform();
-				_dirtyPoints = false;
-			}
+			if( _worldPointTransforms?.Length >= worldPointTransformCountMin && _dirtyCalibration ) UpdateAndSaveCalibration();
 		}
 
 
@@ -425,65 +401,48 @@ namespace TrackingTools
 		}
 
 
+
 		bool CheckCanCalibrate()
 		{
 			if( !_physicalCameraTexture ){
-				Debug.LogWarning( $"{logPrepend} Missing camera texture.\n" );
+				Debug.LogWarning( $"{logPrepend} Cannot calibrate. Missing camera texture.\n" );
 				return false;
 			}
+
 			if( _intrinsics.width != _physicalCameraTexture.width || _intrinsics.height !=_physicalCameraTexture.height ){
-				Debug.LogWarning( $"{logPrepend} Intrinsics ({_intrinsics.width}x{_intrinsics.height}) and Physical Camera Texture ({_physicalCameraTexture.width}x{_physicalCameraTexture.height}) sizes must match.\n" );
+				Debug.LogWarning( $"{logPrepend} Cannot calibrate. Intrinsics ({_intrinsics.width}x{_intrinsics.height}) and Physical Camera Texture ({_physicalCameraTexture.width}x{_physicalCameraTexture.height}) sizes must match.\n" );
 				return false;
 			}
+
+			if( _worldPointTransforms?.Length < worldPointTransformCountMin ){
+				Debug.LogWarning( $"{logPrepend}Cannot calibrate. You must supply at least {worldPointTransformCountMin} transforms.\n" );
+				return false;
+			}
+
 			return true;
 		}
 
 
-		void AdaptResources()
-		{
-			int w = _physicalCameraTexture.width;
-			int h = _physicalCameraTexture.height;
-			if( _isPhysicalCameraTextureDistorted && ( _processedPhysicalCameraTexture == null || _processedPhysicalCameraTexture.width != w || _processedPhysicalCameraTexture.height != h ) ){
-				_processedPhysicalCameraTexture?.Release();
-				_processedPhysicalCameraTexture = new RenderTexture( w, h, 0, _physicalCameraTexture.graphicsFormat );
-				_processedPhysicalCameraTexture.name = "PhysicalCameraTexture";
-			}
-
-			if( _lensUndistorter == null ) _lensUndistorter = new LensUndistorter( _intrinsics );
-
-			if( !_virtualCameraRenderTexture || _virtualCameraRenderTexture.width != w || _virtualCameraRenderTexture.height != h ){
-				if( _virtualCameraRenderTexture ) _virtualCameraRenderTexture.Release();
-				_virtualCameraRenderTexture = new RenderTexture( w, h, 16 );
-				_virtualCameraRenderTexture.name = "VirtualCameraTexture";
-				_virtualCamera.targetTexture = _virtualCameraRenderTexture;
-				_virtualCameraImageUI.texture = _virtualCameraRenderTexture;
-
-				// OPEN CV ALTERNATIVE.
-				//_camTexMat = TrackingToolsHelper.GetCompatibleMat( _physicalCameraTexture );
-				//_camTexGrayMat = new Mat( h, w, CvType.CV_8UC1 );
-				//_camTexGrayUndistortMat = new Mat( h, w, CvType.CV_8UC1 );
-				//_undistortedCameraTexture2D = new Texture2D( w, h, GraphicsFormat.R8_UNorm, 0, TextureCreationFlags.None );
-				//_undistortedCameraTexture2D.name = "UndistortedCameraTex";
-			}
-		}
+		
 
 
 		void UpdateInteraction()
 		{
-			if( Input.GetKeyDown( _resetHotKey ) ){
-				ResetCalibrationPoints();
-				_dirtyPoints = true;
+			if( Keyboard.current[ _resetHotKey ].wasPressedThisFrame ){
+				ResetImageCalibrationPoints();
 			}
 			
 			bool changed = false;
 
-			// Get anchored mouse position withint image rect.
+			// Get anchored mouse position within image rect.
 			Vector2 mousePos;
-			RectTransformUtility.ScreenPointToLocalPointInRectangle( _physicalCameraImageRect, Input.mousePosition, _canvas.worldCamera, out mousePos );
+			var canvas = _containerRect.root.GetComponent<Canvas>();
+			RectTransformUtility.ScreenPointToLocalPointInRectangle( _physicalCameraImageRect, Mouse.current.position.value, canvas.worldCamera, out mousePos );
+			//RectTransformUtility.ScreenPointToLocalPointInRectangle( _physicalCameraImageRect, Mouse.current.position.value, _virtualCamera, out mousePos );
 			mousePos = LocalPixelPositionToAnchoredPosition( mousePos, _physicalCameraImageRect );
 			
 			// Deselect.
-			if( Input.GetMouseButtonUp( 0 ) && _isPointActive && _focusedPointIndex != -1){
+			if( Mouse.current.leftButton.wasReleasedThisFrame && _isPointActive && _focusedPointIndex != -1){
 				SetAnchoredPosition( _userPointRects[_focusedPointIndex], mousePos );
 				changed = true;
 				_userPointImages[_focusedPointIndex].color = pointHoverColor;
@@ -508,7 +467,7 @@ namespace TrackingTools
 					}
 					if( _focusedPointIndex != -1 ){
 						_userPointImages[_focusedPointIndex].color = pointIdleColor;
-						if( Input.GetMouseButtonDown( 0 ) ) {
+						if( Mouse.current.leftButton.wasPressedThisFrame ) {
 							// Select.
 							_userPointImages[nearestPointIndex].color = pointActiveColor;
 							_isPointActive = true;
@@ -521,11 +480,11 @@ namespace TrackingTools
 				}
 			}
 		
-			if( changed ) _dirtyPoints = true;
+			if( changed ) _dirtyCalibration = true;
 		}
 	
 	
-		void UpdateCameraTransform()
+		void UpdateAndSaveCalibration()
 		{
 			// Update points.
 			for( int p = 0; p < _worldPointTransforms.Length; p++ )
@@ -549,6 +508,8 @@ namespace TrackingTools
 
 			// Save.
 			SaveAnchorPoints();
+
+			_dirtyCalibration = false;
 		}
 
 
@@ -559,23 +520,36 @@ namespace TrackingTools
 				Debug.LogError( logPrepend + "Missing instrinsics file: '" + _physicalCameraIntrinsicsFileName + "'\n" );
 				return;
 			}
+
+			// Recreate lens undistorter.
+			_lensUndistorter?.Release();
+			_lensUndistorter = new LensUndistorter( _intrinsics );
+
+			// Apply intrinsics.
+			_intrinsics.ApplyToUnityCamera( _virtualCamera );
+			_aspectFitterUI.aspectRatio = _intrinsics.aspect;
+			//_intrinsics.ApplyToToOpenCV( ref _cameraMatrix, ref _distCoeffs );
 		}
 
 
-		void TryLoadCalibrationPoints()
+		bool TryLoadCalibrationPoints()
 		{
 			string filePath = TrackingToolsConstants.worldPointSetsDirectoryPath + "/" + _calibrationPointsFileName + ".json";
-			if( !File.Exists( filePath ) ) return;
+			if( !File.Exists( filePath ) ) return false;
 
 			string json = File.ReadAllText( filePath );
 			PointSetData data = JsonUtility.FromJson<PointSetData>( json );
 			if( data.points.Length != _worldPointTransforms.Length ){
-				Debug.LogWarning( logPrepend + "Ignored stored point set. Number of points does not match number of transforms in 'worldPointTransforms'.\n" );
-				return;
+				Debug.LogWarning( $"{logPrepend} Ignored stored point set. Number of points does not match number of transforms in 'worldPointTransforms'.\n" );
+				return false;
 			}
 
 			for( int p = 0; p < _worldPointTransforms.Length; p++ ) SetAnchoredPosition( _userPointRects[ p ], data.points[ p ] );
-			_dirtyPoints = true;
+			
+			_needsResetImageCalibrationPoints = false;
+			_dirtyCalibration = true;
+
+			return true;
 		}
 
 
@@ -590,6 +564,93 @@ namespace TrackingTools
 			File.WriteAllText( filePath, JsonUtility.ToJson( data ) );
 
 			//Debug.Log( logPrepend + "Saved anchor points to file.\n" + filePath );
+		}
+
+
+		void AdaptWorldPointTransformResources()
+		{
+			ReleaseWorldPointTransformResources();
+
+			int pointCount = _worldPointTransforms?.Length ?? 0;
+			if( pointCount < worldPointTransformCountMin ) return;
+
+			// UI.
+			_userPointRects = new RectTransform[pointCount];
+			_userPointImages = new Image[pointCount];
+			for( int p = 0; p < pointCount; p++ )
+			{
+				GameObject pointObject = new GameObject( "Point" + p );
+				pointObject.transform.SetParent( _containerRect );
+				Image pointImage = pointObject.AddComponent<Image>();
+				pointImage.color = Color.cyan;
+				RectTransform pointRect = pointObject.GetComponent<RectTransform>();
+				pointRect.sizeDelta = Vector2.one * 5;
+				pointRect.anchoredPosition = Vector3.zero;
+				Text pointLabel = new GameObject( "Label" ).AddComponent<Text>();
+				pointLabel.text = p.ToString();
+				pointLabel.transform.SetParent( pointRect );
+				pointLabel.rectTransform.anchoredPosition = Vector2.zero;
+				pointLabel.rectTransform.sizeDelta = new Vector2( _fontSize, _fontSize ) * 2;
+				pointLabel.font = _font;
+				pointLabel.fontSize = _fontSize;
+				_userPointRects[p] = pointRect;
+				_userPointImages[p] = pointImage;
+			}
+
+			// OpenCV.
+			_calibrationPointsImage = new Point[pointCount];
+			_calibrationPointsWorld = new Point3[pointCount];
+			_calibrationPointsImageMat = new MatOfPoint2f();
+			_calibrationPointsWorldMat = new MatOfPoint3f();
+			_calibrationPointsImageMat.alloc( pointCount );
+			_calibrationPointsWorldMat.alloc( pointCount );
+			for( int p = 0; p < pointCount; p++ ) {
+				_calibrationPointsImage[p] = new Point();
+				_calibrationPointsWorld[p] = new Point3();
+			}
+		}
+
+
+		void ReleaseWorldPointTransformResources()
+		{
+			// UI.
+			if( _userPointRects != null ) foreach( var pointRect in _userPointRects ) if( pointRect && pointRect.gameObject ) Destroy( pointRect.gameObject );
+			_userPointRects = null;
+
+			// OpenCV.
+			_calibrationPointsImageMat?.release();
+			_calibrationPointsWorldMat?.Dispose();
+			_calibrationPointsImageMat = null;
+			_calibrationPointsWorldMat = null;
+		}
+
+
+		void AutoAdaptTextureResources()
+		{
+			if( !_physicalCameraTexture ) return;
+
+			int w = _physicalCameraTexture.width;
+			int h = _physicalCameraTexture.height;
+			if( _isPhysicalCameraTextureDistorted && ( _processedPhysicalCameraTexture == null || _processedPhysicalCameraTexture.width != w || _processedPhysicalCameraTexture.height != h ) ){
+				_processedPhysicalCameraTexture?.Release();
+				_processedPhysicalCameraTexture = new RenderTexture( w, h, 0, _physicalCameraTexture.graphicsFormat );
+				_processedPhysicalCameraTexture.name = "PhysicalCameraTexture";
+			}
+
+			if( !_virtualCameraRenderTexture || _virtualCameraRenderTexture.width != w || _virtualCameraRenderTexture.height != h ){
+				if( _virtualCameraRenderTexture ) _virtualCameraRenderTexture.Release();
+				_virtualCameraRenderTexture = new RenderTexture( w, h, 16 );
+				_virtualCameraRenderTexture.name = "VirtualCameraTexture";
+				_virtualCamera.targetTexture = _virtualCameraRenderTexture;
+				_virtualCameraImageUI.texture = _virtualCameraRenderTexture;
+
+				// OPEN CV ALTERNATIVE.
+				//_camTexMat = TrackingToolsHelper.GetCompatibleMat( _physicalCameraTexture );
+				//_camTexGrayMat = new Mat( h, w, CvType.CV_8UC1 );
+				//_camTexGrayUndistortMat = new Mat( h, w, CvType.CV_8UC1 );
+				//_undistortedCameraTexture2D = new Texture2D( w, h, GraphicsFormat.R8_UNorm, 0, TextureCreationFlags.None );
+				//_undistortedCameraTexture2D.name = "UndistortedCameraTex";
+			}
 		}
 
 

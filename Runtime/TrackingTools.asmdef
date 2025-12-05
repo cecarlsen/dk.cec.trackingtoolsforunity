@@ -2,6 +2,7 @@
     "name": "TrackingTools",
     "rootNamespace": "",
     "references": [
+        "GUID:75469ad4d38634e559750d17036d5f7c",
         "GUID:cef0e9dabbfe59a4790acbf31c21f33e"
     ],
     "includePlatforms": [],
