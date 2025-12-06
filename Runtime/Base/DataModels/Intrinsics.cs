@@ -219,7 +219,7 @@ namespace TrackingTools
 			string filePath = TrackingToolsConstants.intrinsicsDirectoryPath + "/" + fileName;
 			if( !fileName.EndsWith( ".json" ) ) filePath += ".json";
 			if( !File.Exists( filePath ) ) {
-				Debug.LogError( logPrepend + "File missing.\n" + filePath );
+				Debug.LogError( $"{logPrepend}File missing.'\n{filePath}" );
 				return false;
 			}
 

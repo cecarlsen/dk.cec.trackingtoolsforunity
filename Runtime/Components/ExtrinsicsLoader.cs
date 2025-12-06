@@ -65,7 +65,6 @@ namespace TrackingTools
 		public void LoadAndApply()
 		{
 			if( !Extrinsics.TryLoadFromFile( _extrinsicsFileName, out _extrinsics ) ) {
-				enabled = false;
 				return;
 			}
 
@@ -87,6 +86,13 @@ namespace TrackingTools
 			transform.Rotate( _postRotationGlobal, Space.World );
 			transform.Translate( _postOffsetLocal, Space.Self );
 			transform.Translate( _postOffsetGlobal, Space.World );
+		}
+
+
+		public bool FileExists()
+		{
+			if( string.IsNullOrEmpty( _extrinsicsFileName ) ) return false;
+			return Extrinsics.FileExists( _extrinsicsFileName );
 		}
 
 

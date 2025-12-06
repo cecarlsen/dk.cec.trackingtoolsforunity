@@ -48,11 +48,21 @@ namespace TrackingTools
 		}
 
 
+		public static string FileNameToFilePath( string fileName )
+		{
+			string filePath = TrackingToolsConstants.extrinsicsDirectoryPath + "/" + fileName;
+			if( !fileName.EndsWith( ".json" ) ) filePath += ".json";
+			return filePath;
+		}
+
+
+		public static bool FileExists( string fileName ) => File.Exists( FileNameToFilePath( fileName ) );
+
+
 		public string SaveToFile( string fileName )
 		{
 			if( !Directory.Exists( TrackingToolsConstants.extrinsicsDirectoryPath ) ) Directory.CreateDirectory( TrackingToolsConstants.extrinsicsDirectoryPath );
-			string filePath = TrackingToolsConstants.extrinsicsDirectoryPath + "/" + fileName;
-			if( !fileName.EndsWith( ".json" ) ) filePath += ".json";
+			string filePath = FileNameToFilePath( fileName );
 			File.WriteAllText( filePath, JsonUtility.ToJson( this ) );
 			return filePath;
 		}
@@ -67,8 +77,7 @@ namespace TrackingTools
 				return false;
 			}
 
-			string filePath = TrackingToolsConstants.extrinsicsDirectoryPath + "/" + fileName;
-			if( !fileName.EndsWith( ".json" ) ) filePath += ".json";
+			string filePath = FileNameToFilePath( fileName );
 			if( !File.Exists( filePath ) ) {
 				Debug.LogError( logPrepend + "File missing.\n" + filePath );
 				return false;

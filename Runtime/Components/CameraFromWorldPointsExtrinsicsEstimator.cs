@@ -229,10 +229,12 @@ namespace TrackingTools
 			//}
 			_physicalCameraImageUI = new GameObject( "PhysicalCameraImage" ).AddComponent<RawImage>();
 			_physicalCameraImageUI.transform.SetParent( _containerRect );
+			_physicalCameraImageUI.transform.localScale = Vector3.one;
 			_physicalCameraImageUI.rectTransform.FitParent();
 			_physicalCameraImageRect = _physicalCameraImageUI.GetComponent<RectTransform>();
 			_virtualCameraImageUI = new GameObject( "VirtualCameraImage" ).AddComponent<RawImage>();
 			_virtualCameraImageUI.transform.SetParent( _containerRect );
+			_virtualCameraImageUI.transform.localScale = Vector3.one;
 			_virtualCameraImageUI.rectTransform.FitParent();
 			_virtualAlphaGroup = _virtualCameraImageUI.gameObject.AddComponent<CanvasGroup>();
 			_uiMaterial = new Material( Shader.Find( "UI/ScalarTexture" ) );
@@ -436,7 +438,7 @@ namespace TrackingTools
 
 			// Get anchored mouse position within image rect.
 			Vector2 mousePos;
-			var canvas = _containerRect.root.GetComponent<Canvas>();
+			var canvas = _containerRect.GetComponentInParent<Canvas>();
 			RectTransformUtility.ScreenPointToLocalPointInRectangle( _physicalCameraImageRect, Mouse.current.position.value, canvas.worldCamera, out mousePos );
 			//RectTransformUtility.ScreenPointToLocalPointInRectangle( _physicalCameraImageRect, Mouse.current.position.value, _virtualCamera, out mousePos );
 			mousePos = LocalPixelPositionToAnchoredPosition( mousePos, _physicalCameraImageRect );
@@ -520,6 +522,9 @@ namespace TrackingTools
 				Debug.LogError( logPrepend + "Missing instrinsics file: '" + _physicalCameraIntrinsicsFileName + "'\n" );
 				return;
 			}
+
+			// Apply to camera.
+			_intrinsics.ApplyToUnityCamera( _virtualCamera );
 
 			// Recreate lens undistorter.
 			_lensUndistorter?.Release();

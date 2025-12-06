@@ -27,7 +27,7 @@ namespace TrackingTools
 
 		void Awake()
 		{
-			if( _autoLoadTime == AutoLoadTime.Awake ) LoadAndApply();
+			if( enabled && _autoLoadTime == AutoLoadTime.Awake ) LoadAndApply();
 
 		}
 
@@ -40,7 +40,7 @@ namespace TrackingTools
 
 		void Start()
 		{
-			if( _autoLoadTime == AutoLoadTime.Start ) LoadAndApply();
+			if( enabled && _autoLoadTime == AutoLoadTime.Start ) LoadAndApply();
 		}
 
 

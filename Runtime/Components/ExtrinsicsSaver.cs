@@ -20,7 +20,7 @@ namespace TrackingTools
 
 		static string logPrepend = "<b>[" + nameof( ExtrinsicsSaver ) + "]</b> ";
 
-
+		
 
 		public void Save()
 		{
