@@ -38,6 +38,7 @@ namespace TrackingTools
 		[SerializeField] RectTransform _containerRect = null;
 		[SerializeField] Key _interactableHotKey = Key.Digit1;
 		[SerializeField] Key _resetHotKey = Key.Backspace;
+		[SerializeField] Key _precisionHoldHotKey = Key.LeftCtrl;
 		[SerializeField] Font _font = null;
 		[SerializeField] int _fontSize = 12;
 		[SerializeField,Range(0f,1f)] float _virtualAlpha = 0.8f;
@@ -76,6 +77,7 @@ namespace TrackingTools
 		Image[] _userPointImages;
 		int _focusedPointIndex = -1;
 		bool _isPointActive;
+		Vector2 _mouseHitAnchoredPosition;
 
 		// OpenCV.
 		Point[] _calibrationPointsImage;
@@ -94,9 +96,10 @@ namespace TrackingTools
 		//Texture2D _undistortedCameraTexture2D;
 		
 		static readonly Color pointIdleColor = Color.cyan;
-		static readonly Color pointHoverColor = Color.magenta;
+		static readonly Color pointFocusedColor = Color.magenta;
 		static readonly Color pointActiveColor = Color.white;
 		const int worldPointTransformCountMin = 4;
+		const float mouseHitDistanceMinNormalized = 0.1f; // Normalized to image height
 
 		static readonly string logPrepend = $"<b>[{nameof( CameraFromWorldPointsExtrinsicsEstimator )}]</b>";
 
@@ -309,7 +312,7 @@ namespace TrackingTools
 			if( _intrinsics == null ) return;
 			
 			// Only allow calibration if we have a physical camera source texture.
-			if( Keyboard.current[ _interactableHotKey ].wasReleasedThisFrame ){
+			if( _interactableHotKey != Key.None && Keyboard.current[ _interactableHotKey ].wasReleasedThisFrame ){
 				if( !interactable && !CheckCanCalibrate() ) return;
 				interactable = !interactable;
 			}
@@ -423,8 +426,6 @@ namespace TrackingTools
 
 			return true;
 		}
-
-
 		
 
 
@@ -433,56 +434,61 @@ namespace TrackingTools
 			if( Keyboard.current[ _resetHotKey ].wasPressedThisFrame ){
 				ResetImageCalibrationPoints();
 			}
-			
-			bool changed = false;
 
 			// Get anchored mouse position within image rect.
 			Vector2 mousePos;
 			var canvas = _containerRect.GetComponentInParent<Canvas>();
 			RectTransformUtility.ScreenPointToLocalPointInRectangle( _physicalCameraImageRect, Mouse.current.position.value, canvas.worldCamera, out mousePos );
-			//RectTransformUtility.ScreenPointToLocalPointInRectangle( _physicalCameraImageRect, Mouse.current.position.value, _virtualCamera, out mousePos );
-			mousePos = LocalPixelPositionToAnchoredPosition( mousePos, _physicalCameraImageRect );
-			
-			// Deselect.
-			if( Mouse.current.leftButton.wasReleasedThisFrame && _isPointActive && _focusedPointIndex != -1){
-				SetAnchoredPosition( _userPointRects[_focusedPointIndex], mousePos );
-				changed = true;
-				_userPointImages[_focusedPointIndex].color = pointHoverColor;
-				_isPointActive = false;
+			Vector2 mouseAnchoredPos = LocalPixelPositionToAnchoredPosition( mousePos, _physicalCameraImageRect ); // lower left is (0,0), upper right is (1,1)
+
+			// Update point.
+			if( _isPointActive ){
+				float precisionFactor = ( _precisionHoldHotKey != Key.None && Keyboard.current[_precisionHoldHotKey].isPressed ) ? 0.1f : 1f;
+				var newAnchoredPosition = _mouseHitAnchoredPosition + ( mouseAnchoredPos - _mouseHitAnchoredPosition ) * precisionFactor;
+				SetAnchoredPosition( _userPointRects[_focusedPointIndex], newAnchoredPosition );
+				_dirtyCalibration = true;
+			}
+
+			if( _isPointActive ){
+				// Check for deselection.
+				if( Mouse.current.leftButton.wasReleasedThisFrame && _focusedPointIndex != -1){
+					_userPointImages[_focusedPointIndex].color = pointFocusedColor;
+					_isPointActive = false;
+				} 
 			} else {
-				if( _isPointActive ){
-					// Update position.
-					SetAnchoredPosition( _userPointRects[_focusedPointIndex], mousePos );
-					changed = true;
-				} else {
-					// Find nearest point.
-					float sqrDistMin = float.MaxValue;
-					int nearestPointIndex = -1;
-					int pointCount = _worldPointTransforms.Length;
-					for( int p = 0; p < pointCount; p++ ){
-						Vector2 towardsPoint = _userPointRects[p].anchorMin - mousePos;
-						float sqrDist = Vector2.Dot( towardsPoint, towardsPoint );
-						if( sqrDist < sqrDistMin ) {
-							nearestPointIndex = p;
-							sqrDistMin = sqrDist;
-						}
+				// Handle selection.
+				// Find nearest point.
+				float sqrDistMin = mouseHitDistanceMinNormalized * mouseHitDistanceMinNormalized;
+				int nearestPointIndex = -1;
+				int pointCount = _worldPointTransforms.Length;
+				for( int p = 0; p < pointCount; p++ ){
+					Vector2 towardsPoint = _userPointRects[ p ].anchorMin - mouseAnchoredPos;
+					towardsPoint.x *= _aspectFitterUI.aspectRatio;
+					float sqrDist = Vector2.Dot( towardsPoint, towardsPoint );
+					if( sqrDist < sqrDistMin ) {
+						nearestPointIndex = p;
+						sqrDistMin = sqrDist;
 					}
+				}
+				if( nearestPointIndex != -1 ){
 					if( _focusedPointIndex != -1 ){
-						_userPointImages[_focusedPointIndex].color = pointIdleColor;
 						if( Mouse.current.leftButton.wasPressedThisFrame ) {
-							// Select.
+							// Make active.
 							_userPointImages[nearestPointIndex].color = pointActiveColor;
+							_mouseHitAnchoredPosition = mouseAnchoredPos;
 							_isPointActive = true;
 						} else {
-							// Hover.
-							_userPointImages[nearestPointIndex].color = pointHoverColor;
+							// Indicate focused.
+							_userPointImages[nearestPointIndex].color = pointFocusedColor;
 						}
 					}
-					_focusedPointIndex = nearestPointIndex;
+				} else if( _focusedPointIndex != -1 ){
+					// Defocus.
+					_isPointActive = false;
+					_userPointImages[ _focusedPointIndex ].color = pointIdleColor;
 				}
+				_focusedPointIndex = nearestPointIndex;
 			}
-		
-			if( changed ) _dirtyCalibration = true;
 		}
 	
 	
@@ -589,7 +595,7 @@ namespace TrackingTools
 				Image pointImage = pointObject.AddComponent<Image>();
 				pointImage.color = Color.cyan;
 				RectTransform pointRect = pointObject.GetComponent<RectTransform>();
-				pointRect.sizeDelta = Vector2.one * 5;
+				pointRect.sizeDelta = Vector2.one * 3;
 				pointRect.anchoredPosition = Vector3.zero;
 				Text pointLabel = new GameObject( "Label" ).AddComponent<Text>();
 				pointLabel.text = p.ToString();
