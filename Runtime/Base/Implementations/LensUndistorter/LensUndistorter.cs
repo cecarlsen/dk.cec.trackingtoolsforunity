@@ -16,8 +16,9 @@ namespace TrackingTools
 		ComputeBuffer _constantBuffer;
 
 		int _GenerateMapKernel, _UndistortKernel;
-		LocalKeyword _FLIP_Y;
-		LocalKeyword _FLIP_X;
+		LocalKeyword _PRE_FLIP_Y;
+		LocalKeyword _POST_FLIP_Y;
+		//LocalKeyword _FLIP_X;
 
 		public RenderTexture undistortionMap => _undistortionMap;
 
@@ -79,7 +80,8 @@ namespace TrackingTools
 			_material = new Material( shader );
 			_GenerateMapKernel = _material.FindPass( nameof( _GenerateMapKernel ) );
 			_UndistortKernel = _material.FindPass( nameof( _UndistortKernel ) );
-			_FLIP_Y = new LocalKeyword( shader, nameof( _FLIP_Y ) );
+			_PRE_FLIP_Y = new LocalKeyword( shader, nameof( _PRE_FLIP_Y ) );
+			_POST_FLIP_Y = new LocalKeyword( shader, nameof( _POST_FLIP_Y ) );
 
 			_undistortionMap = new RenderTexture( intrinsics.resolution.x, intrinsics.resolution.y, 0, RenderTextureFormat.RGFloat );
 			_undistortionMap.name = "LensDistortionMap";
@@ -143,10 +145,10 @@ namespace TrackingTools
 		/// <summary>
 		/// Undistort a lens distorted image.
 		/// </summary>
-		public void Undistort( Texture distortedTexture, RenderTexture undistortedTexture, bool isTextureAxisYFlipped = false )
+		public void Undistort( Texture distortedTexture, RenderTexture undistortedTexture, bool preFlipY = false, bool postFlipY = false )
 		{
-			// Similar to OpenCV's method, this method expects the input texture to be flipped. So if it is not flipped, then we flip.
-			if( _material.IsKeywordEnabled( _FLIP_Y ) != !isTextureAxisYFlipped ) _material.SetKeyword( _FLIP_Y, !isTextureAxisYFlipped );
+			if( _material.IsKeywordEnabled( _PRE_FLIP_Y ) != preFlipY ) _material.SetKeyword( _PRE_FLIP_Y, preFlipY );
+			if( _material.IsKeywordEnabled( _POST_FLIP_Y ) != postFlipY ) _material.SetKeyword( _POST_FLIP_Y, postFlipY );
 			Graphics.Blit( distortedTexture, undistortedTexture, _material, _UndistortKernel );
 
 			// Always flip after.

@@ -28,6 +28,7 @@ Shader "Hidden/Flipper"
 
 		sampler2D _MainTex;
 		float4 _MainTex_TexelSize;
+		float2 _FlipFlags;
 
 
 		ToFrag Vert( ToVert v )
@@ -35,13 +36,16 @@ Shader "Hidden/Flipper"
 			ToFrag o;
 			o.vertex = UnityObjectToClipPos( v.vertex );
 			o.uv = v.uv;
+
+			if( _FlipFlags.x > 0.0 ) o.uv.x = 1.0 - o.uv.x;
+			if( _FlipFlags.y > 0.0 ) o.uv.y = 1.0 - o.uv.y;
+
 			return o;
 		}
 
 
 		float4 Frag( ToFrag i ) : SV_Target
 		{
-			i.uv.y = 1.0 - i.uv.y;
 			return tex2D( _MainTex, i.uv );
 		}
 

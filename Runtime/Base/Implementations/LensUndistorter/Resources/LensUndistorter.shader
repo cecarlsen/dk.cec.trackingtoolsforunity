@@ -14,7 +14,8 @@ Shader "Hidden/LensUndistorter"
 
 		#include "UnityCG.cginc"
 
-		#pragma multi_compile_local __ _FLIP_Y
+		#pragma multi_compile_local __ _PRE_FLIP_Y
+		#pragma multi_compile_local __ _POST_FLIP_Y
 		
 		struct ToVert
 		{
@@ -86,7 +87,6 @@ Shader "Hidden/LensUndistorter"
 			
 			float3 xyw = float3(_M01,_M11,_M21) * py + float3(_M02,_M12,_M22) + float3(_M00,_M10,_M20) * px;
 			
-			
 			float w = 1.0 / xyw.z;
 			float x = xyw.x * w;
 			float y = xyw.y * w;
@@ -111,10 +111,13 @@ Shader "Hidden/LensUndistorter"
 		
 		float4 FragUndistort( ToFrag i ) : SV_Target
 		{
+			#ifdef _PRE_FLIP_Y
+				i.uv.y = 1.0 - i.uv.y;
+			#endif
 
 			float2 distortUV = tex2D( _UndistMapTex, i.uv ).xy;
 			
-			#ifdef _FLIP_Y
+			#ifdef _POST_FLIP_Y
 				distortUV.y = 1.0 - distortUV.y;
 			#endif
 			
