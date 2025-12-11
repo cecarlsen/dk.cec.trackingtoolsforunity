@@ -26,8 +26,8 @@ namespace TrackingTools
 		[Header("Input")]
 		[SerializeField] Transform[] _worldPointTransforms = null;
 		[SerializeField] Texture _physicalCameraTexture = null;
-		[SerializeField] bool _isPhysicalCameraTextureFlipped = true;
-		[SerializeField] bool _isPhysicalCameraTextureDistorted = true;
+		[SerializeField] bool _preFlipPhysicalCameraTextureY = true;
+		[SerializeField] bool _undistortPhysicalCameraTexture = true;
 		[SerializeField] string _physicalCameraIntrinsicsFileName = "DefaultCamera";
 		[SerializeField,Tooltip("Without extension name (which is .json)")] string _calibrationPointsFileName = "DefaultPoints";
 
@@ -51,6 +51,9 @@ namespace TrackingTools
 		[SerializeField] Vector3 _pointLabelOffset = Vector3.zero;
 		[SerializeField] bool _drawPointGizmos = true;
 		[SerializeField] float _pointGizmoRadius = 0.005f;
+
+		[Header("Debug")]
+		[SerializeField] bool _logWarnings = false;
 
 		//[Header("Other")]
 		//[SerializeField] bool _undistortOnGpu = true;
@@ -99,7 +102,7 @@ namespace TrackingTools
 		static readonly Color pointFocusedColor = Color.magenta;
 		static readonly Color pointActiveColor = Color.white;
 		const int worldPointTransformCountMin = 4;
-		const float mouseHitDistanceMinNormalized = 0.1f; // Normalized to image height
+		const float mouseHitDistanceMinNormalized = 0.2f; // Normalized to image height
 
 		static readonly string logPrepend = $"<b>[{nameof( CameraFromWorldPointsExtrinsicsEstimator )}]</b>";
 
@@ -134,18 +137,18 @@ namespace TrackingTools
 			}
 		}
 
-		public bool isPhysicalCameraTextureFlipped {
-			get { return _isPhysicalCameraTextureFlipped; }
+		public bool preFlipPhysicalCameraTextureY {
+			get { return _preFlipPhysicalCameraTextureY; }
 			set {
-				_isPhysicalCameraTextureFlipped = value;
+				_preFlipPhysicalCameraTextureY = value;
 				_dirtyTexture = true;
 			}
 		}
 
-		public bool isPhysicalCameraTextureDistorted {
-			get { return _isPhysicalCameraTextureDistorted; }
+		public bool undistortPhysicalCameraTexture {
+			get { return _undistortPhysicalCameraTexture; }
 			set {
-				_isPhysicalCameraTextureDistorted = value;
+				_undistortPhysicalCameraTexture = value;
 				_dirtyTexture = true;
 			}
 		}
@@ -242,6 +245,7 @@ namespace TrackingTools
 			_virtualAlphaGroup = _virtualCameraImageUI.gameObject.AddComponent<CanvasGroup>();
 			_uiMaterial = new Material( Shader.Find( "UI/ScalarTexture" ) );
 			_physicalCameraImageUI.material = _uiMaterial;
+			_uiMaterial.SetColor( "_BurnoutColor", new Color( 0.5f, 0f, 0f, 1f ) );
 			_aspectFitterUI = _containerRect.gameObject.GetComponent<AspectRatioFitter>();
 			if( !_aspectFitterUI ) _aspectFitterUI = _containerRect.gameObject.AddComponent<AspectRatioFitter>();
 			_aspectFitterUI.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
@@ -305,7 +309,6 @@ namespace TrackingTools
 
 
 
-
 		void Update()
 		{
 			// Check basic needs.
@@ -313,7 +316,7 @@ namespace TrackingTools
 			
 			// Only allow calibration if we have a physical camera source texture.
 			if( _interactableHotKey != Key.None && Keyboard.current[ _interactableHotKey ].wasReleasedThisFrame ){
-				if( !interactable && !CheckCanCalibrate() ) return;
+				//if( !_interactable && !CheckCanCalibrate() ) return;
 				interactable = !interactable;
 			}
 
@@ -327,14 +330,13 @@ namespace TrackingTools
 				{
 					//if( _undistortOnGpu ){
 
-						if( _isPhysicalCameraTextureDistorted ){
-							_lensUndistorter.Undistort( _physicalCameraTexture, _processedPhysicalCameraTexture, _isPhysicalCameraTextureFlipped );
-							_flipper.Flip( _processedPhysicalCameraTexture );
-						} else if( _isPhysicalCameraTextureFlipped ) {
+						if( _undistortPhysicalCameraTexture ){
+							_lensUndistorter.Undistort( _physicalCameraTexture, _processedPhysicalCameraTexture, _preFlipPhysicalCameraTextureY );
+						} else if( _preFlipPhysicalCameraTextureY ) {
 							_flipper.Flip( _physicalCameraTexture, _processedPhysicalCameraTexture );
 						}
 				
-						_physicalCameraImageUI.texture = _isPhysicalCameraTextureFlipped || _isPhysicalCameraTextureDistorted ? _processedPhysicalCameraTexture : _physicalCameraTexture;
+						_physicalCameraImageUI.texture = _preFlipPhysicalCameraTextureY || _undistortPhysicalCameraTexture ? _processedPhysicalCameraTexture : _physicalCameraTexture;
 
 						/*
 					} else {
@@ -410,17 +412,17 @@ namespace TrackingTools
 		bool CheckCanCalibrate()
 		{
 			if( !_physicalCameraTexture ){
-				Debug.LogWarning( $"{logPrepend} Cannot calibrate. Missing camera texture.\n" );
+				if( _logWarnings ) Debug.LogWarning( $"{logPrepend} Cannot calibrate. Missing camera texture.\n" );
 				return false;
 			}
 
 			if( _intrinsics.width != _physicalCameraTexture.width || _intrinsics.height !=_physicalCameraTexture.height ){
-				Debug.LogWarning( $"{logPrepend} Cannot calibrate. Intrinsics ({_intrinsics.width}x{_intrinsics.height}) and Physical Camera Texture ({_physicalCameraTexture.width}x{_physicalCameraTexture.height}) sizes must match.\n" );
+				if( _logWarnings ) Debug.LogWarning( $"{logPrepend} Cannot calibrate. Intrinsics ({_intrinsics.width}x{_intrinsics.height}) and Physical Camera Texture ({_physicalCameraTexture.width}x{_physicalCameraTexture.height}) sizes must match.\n" );
 				return false;
 			}
 
 			if( _worldPointTransforms?.Length < worldPointTransformCountMin ){
-				Debug.LogWarning( $"{logPrepend}Cannot calibrate. You must supply at least {worldPointTransformCountMin} transforms.\n" );
+				if( _logWarnings ) Debug.LogWarning( $"{logPrepend}Cannot calibrate. You must supply at least {worldPointTransformCountMin} transforms.\n" );
 				return false;
 			}
 
@@ -523,6 +525,8 @@ namespace TrackingTools
 
 		void TryLoadPhysicalCameraIntrinsics()
 		{
+			if( string.IsNullOrEmpty( _physicalCameraIntrinsicsFileName ) ) return;
+
 			if( !Intrinsics.TryLoadFromFile( _physicalCameraIntrinsicsFileName, out _intrinsics ) ) {
 				enabled = false;
 				Debug.LogError( logPrepend + "Missing instrinsics file: '" + _physicalCameraIntrinsicsFileName + "'\n" );
@@ -551,7 +555,7 @@ namespace TrackingTools
 			string json = File.ReadAllText( filePath );
 			PointSetData data = JsonUtility.FromJson<PointSetData>( json );
 			if( data.points.Length != _worldPointTransforms.Length ){
-				Debug.LogWarning( $"{logPrepend} Ignored stored point set. Number of points does not match number of transforms in 'worldPointTransforms'.\n" );
+				if( _logWarnings ) Debug.LogWarning( $"{logPrepend} Ignored stored point set. Number of points does not match number of transforms in 'worldPointTransforms'.\n" );
 				return false;
 			}
 
@@ -642,7 +646,7 @@ namespace TrackingTools
 
 			int w = _physicalCameraTexture.width;
 			int h = _physicalCameraTexture.height;
-			if( _isPhysicalCameraTextureDistorted && ( _processedPhysicalCameraTexture == null || _processedPhysicalCameraTexture.width != w || _processedPhysicalCameraTexture.height != h ) ){
+			if( _undistortPhysicalCameraTexture && ( _processedPhysicalCameraTexture == null || _processedPhysicalCameraTexture.width != w || _processedPhysicalCameraTexture.height != h ) ){
 				_processedPhysicalCameraTexture?.Release();
 				_processedPhysicalCameraTexture = new RenderTexture( w, h, 0, _physicalCameraTexture.graphicsFormat );
 				_processedPhysicalCameraTexture.name = "PhysicalCameraTexture";

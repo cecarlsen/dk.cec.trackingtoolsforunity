@@ -73,13 +73,13 @@ namespace TrackingTools
 			extrinsics = null;
 
 			if( !Directory.Exists( TrackingToolsConstants.extrinsicsDirectoryPath ) ) {
-				Debug.LogError( logPrepend + "Directory missing.\n" + TrackingToolsConstants.extrinsicsDirectoryPath );
+				Debug.LogWarning( logPrepend + "Directory missing.\n" + TrackingToolsConstants.extrinsicsDirectoryPath );
 				return false;
 			}
 
 			string filePath = FileNameToFilePath( fileName );
 			if( !File.Exists( filePath ) ) {
-				Debug.LogError( logPrepend + "File missing.\n" + filePath );
+				Debug.LogWarning( logPrepend + "File missing.\n" + filePath );
 				return false;
 			}
 

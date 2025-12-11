@@ -1,5 +1,5 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2024
+	Copyright © Carl Emil Carlsen 2024-2025
 	http://cec.dk
 */
 
@@ -13,14 +13,15 @@ namespace TrackingTools
 		[SerializeField] string _intrinsicsFileName = "DefaultCamera";
 		[SerializeField] AutoLoadTime _loadTime = AutoLoadTime.Awake;
 		[SerializeField] bool _logActions = true;
-		[SerializeField,Tooltip("We use an arbitrary focal length to derive the sensor size.")] float _focalLength = 100f;
+		[SerializeField,Tooltip("We use an arbitrary focal length to derive the sensor size.")] float _focalLength = 50f;
 
 		[Header("Output")]
-		[SerializeField,Tooltip("Just forwarding the focal length as defined above." )] UnityEvent<float> _focalLengthEvent = new UnityEvent<float>();
-		[SerializeField,Tooltip("Sensor size as defined in Unity camera with 'physicalCamera' enabled.")] UnityEvent<Vector2> _derivedSensorSizeEvent = new UnityEvent<Vector2>();
-		[SerializeField,Tooltip("Lens shift as defined in Unity camera with 'physicalCamera' enabled.")] UnityEvent<Vector2> _lensShiftEvent = new UnityEvent<Vector2>();
-		[SerializeField,Tooltip("Degrees")] UnityEvent<float> _verticalFieldOfViewEvent = new UnityEvent<float>();
-		[SerializeField,Tooltip("Degrees")] UnityEvent<float> _horizontalFieldOfViewEvent = new UnityEvent<float>();
+		[SerializeField,Tooltip("Focal length, sensorsize, lens shift." )] UnityEvent<float,Vector2,Vector2> _intrinsicsEvent = new();
+		[SerializeField,Tooltip("Just forwarding the focal length as defined above." )] UnityEvent<float> _focalLengthEvent = new();
+		[SerializeField,Tooltip("Sensor size as defined in Unity camera with 'physicalCamera' enabled.")] UnityEvent<Vector2> _derivedSensorSizeEvent = new();
+		[SerializeField,Tooltip("Lens shift as defined in Unity camera with 'physicalCamera' enabled.")] UnityEvent<Vector2> _lensShiftEvent = new();
+		[SerializeField,Tooltip("Degrees")] UnityEvent<float> _verticalFieldOfViewEvent = new();
+		[SerializeField,Tooltip("Degrees")] UnityEvent<float> _horizontalFieldOfViewEvent = new();
 
 		[Header("Debug")]
 		[SerializeField] GizmoMode _displayFrustumGizmo = GizmoMode.Never;
@@ -55,6 +56,12 @@ namespace TrackingTools
 		}
 
 
+		public void SetIntrinsicsFileName( string intrinsicsFileName )
+		{
+			_intrinsicsFileName = intrinsicsFileName;
+		}
+
+
 		public void LoadAndOutput()
 		{
 			if( !Intrinsics.TryLoadFromFile( _intrinsicsFileName, out _intrinsics ) ){
@@ -64,9 +71,12 @@ namespace TrackingTools
 
 			if( _logActions ) Debug.Log( logPrepend + "Loaded intrinsics from file at '" + TrackingToolsHelper.GetIntrinsicsFilePath( _intrinsicsFileName ) + "'.\n" );
 
+			var sensorSize = _intrinsics.GetDerivedSensorSize( _focalLength );
+			var lensShift = _intrinsics.lensShift;
+			_intrinsicsEvent.Invoke( _focalLength, sensorSize, lensShift );
 			_focalLengthEvent.Invoke( _focalLength );
-			_derivedSensorSizeEvent.Invoke( _intrinsics.GetDerivedSensorSize( _focalLength ) );
-			_lensShiftEvent.Invoke( _intrinsics.lensShift );
+			_derivedSensorSizeEvent.Invoke( sensorSize );
+			_lensShiftEvent.Invoke( lensShift );
 			_verticalFieldOfViewEvent.Invoke( _intrinsics.verticalFieldOfView );
 			_horizontalFieldOfViewEvent.Invoke( _intrinsics.horizontalFieldOfView );
 		}

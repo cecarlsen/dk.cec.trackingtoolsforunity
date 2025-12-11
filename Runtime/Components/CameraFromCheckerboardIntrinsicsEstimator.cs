@@ -23,6 +23,7 @@ namespace TrackingTools
 		[SerializeField] int _desiredSampleCount = 4; // Four perfect samples should be ideal https://medium.com/@hey_duda/the-magic-behind-camera-calibration-8596b7ddcd71
 		[SerializeField] bool _flipSourceTextureVertically = false;
 		[SerializeField,Tooltip("Some lenses are designed with no distortion.")] bool _linearOpticalLens = false;
+		[SerializeField] bool _limitFpsTo30 = false;
 
 		[Header("Output")]
 		[SerializeField] string _intrinsicsFileName = "240101_DefaultCamera_1280x720";
@@ -69,8 +70,8 @@ namespace TrackingTools
 		int _chessPatternPointCount;
 
 		const float lowMovementThreshold = 0.003f;
-		const int stableFrameCountThreshold = 50;
-		const int correctDistortionSampleCountThreshold = 3;		
+		const int stableFrameCountThreshold = 100;
+		const int correctDistortionSampleCountThreshold = 3;
 
 		static readonly string logPrepend = "<b>[" + nameof( CameraFromCheckerboardIntrinsicsEstimator ) + "]</b> ";
 
@@ -91,7 +92,7 @@ namespace TrackingTools
 		}
 
 
-		void Awake()
+		void OnEnable()
 		{
 			if( !_checkerboard ){
 				Debug.LogError( logPrepend + "Missing checkerboard reference.\n" );
@@ -99,7 +100,7 @@ namespace TrackingTools
 				return;
 			}
 
-			Application.targetFrameRate = 30;
+			if( _limitFpsTo30 ) Application.targetFrameRate = 30;
 
 			_chessPatternPointCount = _checkerboard.checkerPatternSize.x * _checkerboard.checkerPatternSize.y;
 
@@ -142,16 +143,25 @@ namespace TrackingTools
 		}
 
 
-		void OnDestroy()
+		void OnDisable()
 		{
-			if( _camTexMat != null ) _camTexMat.Dispose();
 			if( _tempTransferTexture ) Destroy( _tempTransferTexture );
-			if( _chessCornersImageMat != null ) _chessCornersImageMat.Dispose();
 			if( _previewMaterial ) Destroy( _previewMaterial );
-			if( _arTexture ) _arTexture.Release();
-			if( _chessPatternTexture ) _chessPatternTexture.Release();
 			if( _patternRenderMaterial ) Destroy( _patternRenderMaterial );
-			if( _chessCornersWorldMat != null ) _chessCornersWorldMat.Dispose();
+			_tempTransferTexture = null;
+			_previewMaterial = null;
+			_patternRenderMaterial = null;
+
+			_camTexMat?.Dispose();
+			_chessCornersImageMat?.Dispose();
+			_arTexture?.Release();
+			_chessPatternTexture?.Release();
+			_chessCornersWorldMat?.Dispose();
+			_camTexMat = null;
+			_chessCornersImageMat = null;
+			_arTexture = null;
+			_chessPatternTexture = null;
+			_chessCornersWorldMat = null;
 
 			Reset();
 		}

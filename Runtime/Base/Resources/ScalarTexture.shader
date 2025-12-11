@@ -4,6 +4,7 @@
 	{
 		_MainTex ("Texture", 2D) = "white" {}
 		_Brightness ("Brightness", Float) = 1.0
+		_BurnoutColor ("Burnout Color", Color) = ( 1.0, 1.0, 1.0, 1.0 )
 		[Toggle(FLIP_VERTICALLY)] _FlipVertically("Flip Vertically", Int) = 0
 	}
 	SubShader
@@ -37,6 +38,7 @@
 			sampler2D _MainTex;
 			float4 _MainTex_ST;
 			half _Brightness;
+			half4 _BurnoutColor;
 			int _FlipVertically;
 
 
@@ -50,9 +52,12 @@
 				return o;
 			}
 
-			fixed4 Frag( v2f i ) : SV_Target
+			half4 Frag( v2f i ) : SV_Target
 			{
-				return fixed4( tex2D( _MainTex, i.uv ).rrr * _Brightness, 1 ) * i.color;
+				float4 col = i.color;
+				float monocrhome = tex2D( _MainTex, i.uv ).r;
+				col.rgb *= monocrhome >= 1.0 ? _BurnoutColor.rgb : monocrhome.xxx * _Brightness;
+				return col;
 			}
 			ENDCG
 		}
