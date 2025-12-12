@@ -44,6 +44,12 @@ namespace TrackingTools
 		}
 
 
+		public void SetIntrinsicsFileName( string intrinsicsFileName )
+		{
+			_intrinsicsFileName = intrinsicsFileName;
+		}
+
+
 		public void LoadAndApply()
 		{
 			Intrinsics intrinsics;

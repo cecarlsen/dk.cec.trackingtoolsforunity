@@ -8,7 +8,7 @@
 	Imagine you crop a 16:9 camera to 4:3. This will most
 	certainly change the distortion coefficents.
 
-	OpenCV camera intrinsics matrix
+	OpenCV camera intrinsics matrix:
 	
 		[ fx,  0, cx ]
 		[  0, fy, cy ]
@@ -75,42 +75,42 @@ namespace TrackingTools
 		public double fy => _fy;
 
 		/// <summary>
-		/// Radial distortion K1.
+		/// Radial distortion K1, as defined by OpenCV.
 		/// </summary>
 		public double k1 => _distortionCoeffs?.Length > 0 ? _distortionCoeffs[ 0 ] : 0.0;
 
 		/// <summary>
-		/// Radial distortion K1.
+		/// Radial distortion K2, as defined by OpenCV.
 		/// </summary>
 		public double k2 => _distortionCoeffs?.Length > 1 ? _distortionCoeffs[ 1 ] : 0.0;
 
 		/// <summary>
-		/// Radial distortion K3.
+		/// Radial distortion K3, as defined by OpenCV.
 		/// </summary>
 		public double k3 => _distortionCoeffs?.Length > 4 ? _distortionCoeffs[ 4 ] : 0.0;
 
 		/// <summary>
-		/// Radial distortion K4.
+		/// Radial distortion K4, as defined by OpenCV.
 		/// </summary>
 		public double k4 => _distortionCoeffs?.Length > 5 ? _distortionCoeffs[ 5 ] : 0.0;
 
 		/// <summary>
-		/// Radial distortion K5.
+		/// Radial distortion K5, as defined by OpenCV.
 		/// </summary>
 		public double k5 => _distortionCoeffs?.Length > 6 ? _distortionCoeffs[ 6 ] : 0.0;
 
 		/// <summary>
-		/// Radial distortion K6.
+		/// Radial distortion K6, as defined by OpenCV.
 		/// </summary>
 		public double k6 => _distortionCoeffs?.Length > 7 ? _distortionCoeffs[ 7 ] : 0.0;
 
 		/// <summary>
-		/// Tangential distortion P1.
+		/// Tangential distortion P1, as defined by OpenCV.
 		/// </summary>
 		public double p1 => _distortionCoeffs?.Length > 2 ? _distortionCoeffs[ 2 ] : 0.0;
 
 		/// <summary>
-		/// Tangential distortion P1.
+		/// Tangential distortion P1, as defined by OpenCV.
 		/// </summary>
 		public double p2 => _distortionCoeffs?.Length > 3 ? _distortionCoeffs[ 3 ] : 0.0;
 
@@ -142,11 +142,7 @@ namespace TrackingTools
 		/// <summary>
 		/// Lens shift value as applied to Unity cameras.
 		/// </summary>
-		public Vector2 lensShift =>
-			new Vector2(
-				(float) -( ( _cx / (double) _resolution.x ) - 0.5 ),
-				(float) ( ( _cy / (double) _resolution.y ) - 0.5 )
-			);
+		public Vector2 lensShift => PrincipalPointToLensShift( _cx, _cy, _resolution ); // Will flip the y-axis to convert from OpenCV to Unity camera space. 
 
 		/// <summary>
 		/// Vertical field of view (fov) angle in degrees as applied to Unity cameras.
@@ -167,25 +163,14 @@ namespace TrackingTools
 		/// Given a known (or made up) focal length, compute the sensor size.
 		/// OpenCV intrinsics neither knows the sensor size or the focal length, but knowing one we can derive the other.
 		/// </summary>
-		public Vector2 GetDerivedSensorSize( float focalLength )
-		{
-			// Given that fx = F * sx.
-			return new Vector2(
-				(float) ( focalLength * _resolution.x / _fx ),
-				(float) ( focalLength * _resolution.y / _fy )
-			);
-		}
+		public Vector2 GetDerivedSensorSize( float focalLength ) => GetDerivedSensorSize( focalLength, _fx, _fy, _resolution );
 
 
 		/// <summary>
 		/// Given a known (or made up) sensor size, compute the focal length.
 		/// OpenCV intrinsics neither knows the sensor size or the focal length, but knowing one we can derive the other.
 		/// </summary>
-		public float GetDerivedFocalLength( Vector2 sensorSize )
-		{
-			// Given that fx = F * sx.
-			return (float) ( _fx / ( sensorSize.x / (float) _resolution.x ) );
-		}
+		public float GetDerivedFocalLength( Vector2 sensorSize ) => GetDerivedFocalLength( sensorSize, _fx, _resolution );
 
 
 		/// <summary>
@@ -354,10 +339,8 @@ namespace TrackingTools
 
 			_resolution = new Vector2Int( cam.pixelWidth, cam.pixelHeight );
 
-			_cx = ( -cam.lensShift.x + 0.5f ) * _resolution.x;
-			_cy = (  cam.lensShift.y + 0.5f ) * _resolution.y;
-			_fx = ( cam.focalLength / cam.sensorSize.x ) * _resolution.x;
-			_fy = ( cam.focalLength / cam.sensorSize.y ) * _resolution.y;
+			LensShiftToPrincipalPoint( cam.lensShift, _resolution, out _cx, out _cy ); // Note that this will flip shift y to convert from Unity to OpenCV camera space.
+			GetDerivedFocalLengths( cam.focalLength, cam.sensorSize, _resolution, out _fx, out _fy );
 
 			_distortionCoeffs = new double[ defaultDistortionCoeffCount ]; // No distortion.
 
@@ -380,7 +363,7 @@ namespace TrackingTools
 			cam.orthographic = false;
 			cam.usePhysicalProperties = true;
 			cam.gateFit = Camera.GateFitMode.None;
-			cam.lensShift = lensShift;
+			cam.lensShift = lensShift; // The lensShift get property will slip the y-axis to convert to Unity camera space.
 			cam.sensorSize = GetDerivedSensorSize( cam.focalLength ); // Just use the cameras current focal length to derive the sensor size.
 		}
 
@@ -484,6 +467,55 @@ namespace TrackingTools
 				m32 = -1,
 				//m33 = 0f,
 			};
+		}
+
+
+		public static void GetDerivedFocalLengths( float focalLength, Vector2 sensorSize, Vector2Int resolution, out double fx, out double fy )
+		{
+			fx = resolution.x * focalLength / sensorSize.x;
+			fy = resolution.y * focalLength / sensorSize.y;
+		}
+
+
+		public static Vector2 GetDerivedSensorSize( float focalLength, double fx, double fy, Vector2Int resolution )
+		{
+			// Given that fx = F * sx.
+			return new Vector2(
+				(float) ( focalLength * resolution.x / fx ),
+				(float) ( focalLength * resolution.y / fy )
+			);
+		}
+
+
+		public static float GetDerivedFocalLength( Vector2 sensorSize, double fx, Vector2Int resolution )
+		{
+			// Given that fx = F * sx and sx = sensorSize.x / resolution.x.
+			return (float) ( fx / ( sensorSize.x / (float) resolution.x ) );
+		}
+
+
+		public static Vector2 PrincipalPointToLensShift( double cx, double cy, Vector2Int resolution )
+		{
+			// It seems counter intuitive, but flipping only X makes point clouds look right. TODO: investigate.
+			return new Vector2(
+				(float) -( ( cx / (double) resolution.x ) - 0.5 ), 
+				(float) ( ( cy / (double) resolution.y ) - 0.5 )
+			);
+			//return new Vector2(
+			//	(float) ( ( cx / (double) resolution.x ) - 0.5 ),
+			//	(float) -( ( cy / (double) resolution.y ) - 0.5 ) // Note that we flip the y-axis to convert from OpenCV to Unity camera space. 
+			//);
+		}
+
+
+		public static void LensShiftToPrincipalPoint( Vector2 lensShift, Vector2Int resolution, out double cx, out double cy )
+		{
+			// It seems counter intuitive, but flipping only X makes point clouds look right. TODO: investigate.
+			cx = ( -lensShift.x + 0.5 ) * resolution.x;
+			cy = ( lensShift.y + 0.5 ) * resolution.y;
+
+			//cx = ( lensShift.x + 0.5 ) * resolution.x;
+			//cy = ( -lensShift.y + 0.5 ) * resolution.y; // Note that we flip the y-axis to convert from Unity to OpenCV camera space. 
 		}
 	}
 }

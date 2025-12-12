@@ -500,7 +500,7 @@ namespace TrackingTools
 			for( int p = 0; p < _worldPointTransforms.Length; p++ )
 			{
 				Vector2 posImage = _userPointRects[ p ].anchorMin; // Min and max should be the same.
-				posImage.y = 1f - posImage.y; // OpenCv pixels are flipped vertically.
+				posImage.y = 1f - posImage.y; // OpenCv pixels are flipped vertically so (0,0) is at the top left corner.
 				posImage.Scale( new Vector2( _intrinsics.width, _intrinsics.height ) );
 				_calibrationPointsImage[ p ].set( new double[]{ posImage.x, posImage.y } );
 				Vector3 posWorld = _worldPointTransforms[ p ].position;

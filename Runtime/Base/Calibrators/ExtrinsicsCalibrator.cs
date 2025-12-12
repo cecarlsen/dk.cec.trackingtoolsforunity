@@ -1,11 +1,10 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2020-2022
+	Copyright © Carl Emil Carlsen 2020-2025
 	http://cec.dk
 */
 
 using OpenCVForUnity.CoreModule;
 using OpenCVForUnity.Calib3dModule;
-using System.Diagnostics;
 
 namespace TrackingTools
 {
@@ -37,9 +36,12 @@ namespace TrackingTools
 		public bool UpdateExtrinsics( MatOfPoint3f patternPointsWorldMat, MatOfPoint2f patternPointsImageMat, Intrinsics intrinsics )
 		{
 
-			// In order to match OpenCV's pixel space (zero at top-left) and Unity's camera space (up is positive), we flip the sensor matrix vertically.
+			// OpenCV's solvePnP will find a result in OpenCV camera space, where Y is flipped. So to compute the result for Unity we flip the sensor matrix vertically.
 			intrinsics.ApplyToOpenCV( ref _sensorMatrix );
 			_sensorMatrix.WriteValue( - _sensorMatrix.ReadValue( 1, 1 ), 1, 1 ); // fy
+			//_sensorMatrix.WriteValue( - _sensorMatrix.ReadValue( 0, 0 ), 0, 0 ); // fx
+			//_sensorMatrix.WriteValue( intrinsics.width - _sensorMatrix.ReadValue( 0, 2 ), 0, 2 ); // cx
+			
 
 			//UnityEngine.Debug.Log( "_sensorMatrix:\n" + _sensorMatrix.dump() );
 			//UnityEngine.Debug.Log( "patternPointsWorldMat:\n" + patternPointsWorldMat.dump() );

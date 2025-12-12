@@ -92,7 +92,8 @@ namespace TrackingTools
 		{
 			Vector3 rotationVector = rotationVectorMat.ReadVector3();
 			rotation = Quaternion.AngleAxis( rotationVector.magnitude * Mathf.Rad2Deg, rotationVector );
-			translation = translationVectorMat.ReadVector3(); 
+
+			translation = translationVectorMat.ReadVector3();
 
 			// Store the inverse. It seems more intuitive to store the extrinsics of the camera, not the calibration board.
 			rotation = Quaternion.Inverse( rotation );
