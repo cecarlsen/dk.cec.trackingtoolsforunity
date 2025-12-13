@@ -145,6 +145,11 @@ namespace TrackingTools
 
 		void OnDisable()
 		{
+			if( _chessPatternTransform ) Destroy( _chessPatternTransform.gameObject );
+			if( _arImage ) Destroy( _arImage.gameObject );
+			_chessPatternTransform = null;
+			_arImage = null;
+
 			if( _tempTransferTexture ) Destroy( _tempTransferTexture );
 			if( _previewMaterial ) Destroy( _previewMaterial );
 			if( _patternRenderMaterial ) Destroy( _patternRenderMaterial );
