@@ -83,8 +83,20 @@ namespace TrackingTools
 			_PRE_FLIP_Y = new LocalKeyword( shader, nameof( _PRE_FLIP_Y ) );
 			_POST_FLIP_Y = new LocalKeyword( shader, nameof( _POST_FLIP_Y ) );
 
-			_undistortionMap = new RenderTexture( intrinsics.resolution.x, intrinsics.resolution.y, 0, RenderTextureFormat.RGFloat );
-			_undistortionMap.name = "LensDistortionMap";
+			int stride = Marshal.SizeOf( typeof( Constants ) );
+			_constantBuffer = new ComputeBuffer( count: 1, stride, ComputeBufferType.Constant );
+
+			UpdateIntrinsics( intrinsics );
+		}
+
+
+		public void UpdateIntrinsics( Intrinsics intrinsics )
+		{
+			if( !_undistortionMap || _undistortionMap.width != intrinsics.resolution.x || _undistortionMap.height != intrinsics.resolution.y){
+				if( _undistortionMap ) _undistortionMap.Release();
+				_undistortionMap = new RenderTexture( intrinsics.resolution.x, intrinsics.resolution.y, 0, RenderTextureFormat.RGFloat );
+				_undistortionMap.name = "LensDistortionMap";
+			}
 
 			Matrix4x4 camMatrix = new Matrix4x4(
 				new Vector4( (float) intrinsics.fx, 0f, 0, 0f ),
@@ -119,8 +131,6 @@ namespace TrackingTools
 			c._M10 = camMatrix.m10;
 			c._M20 = camMatrix.m20;
 
-			int stride = Marshal.SizeOf( typeof( Constants ) );
-			_constantBuffer = new ComputeBuffer( count: 1, stride, ComputeBufferType.Constant );
 			_constantBuffer.SetData( new Constants[]{ c } );
 			_material.SetConstantBuffer( ShaderIDs._Constants, _constantBuffer, offset: 0, _constantBuffer.stride );
 

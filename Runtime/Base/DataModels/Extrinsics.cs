@@ -88,7 +88,7 @@ namespace TrackingTools
 		}
 
 
-		public void UpdateFromOpenCvSolvePnp( Mat rotationVectorMat, Mat translationVectorMat )
+		public void UpdateFromOpenCv( Mat rotationVectorMat, Mat translationVectorMat )
 		{
 			Vector3 rotationVector = rotationVectorMat.ReadVector3();
 			rotation = Quaternion.AngleAxis( rotationVector.magnitude * Mathf.Rad2Deg, rotationVector );
@@ -114,6 +114,7 @@ namespace TrackingTools
 			rotMat.m21 = (float) rotation3x3Mat.ReadValue( 2, 1 );
 			rotMat.m22 = (float) rotation3x3Mat.ReadValue( 2, 2 );
 			rotation = rotMat.rotation;
+
 			translation = translationVectorMat.ReadVector3();
 
 			// Store the inverse. It is more intuitive to store the extrinsics of the **camera**, not the calibration board.

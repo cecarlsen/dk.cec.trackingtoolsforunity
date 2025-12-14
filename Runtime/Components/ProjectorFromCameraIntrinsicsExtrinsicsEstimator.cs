@@ -84,9 +84,9 @@ namespace TrackingTools
 
 		// Calibrators.
 		Intrinsics _cameraIntrinsics;
-		ExtrinsicsCalibrator _cameraExtrinsicsCalibrator;
-		IntrinsicsCalibrator _projectorIntrinsicsCalibrator;
-		StereoExtrinsicsCalibrator _stereoExtrinsicsCalibrator;
+		SolvePnpOperation _cameraExtrinsicsCalibrator;
+		CalibrateCameraOperation _projectorIntrinsicsCalibrator;
+		StereoCalibrateOperation _stereoExtrinsicsCalibrator;
 
 		// OpenCV.
 		Mat _camTexMat;
@@ -216,8 +216,8 @@ namespace TrackingTools
 			}
 
 			// Calibrators.
-			_cameraExtrinsicsCalibrator = new ExtrinsicsCalibrator();
-			_stereoExtrinsicsCalibrator = new StereoExtrinsicsCalibrator();
+			_cameraExtrinsicsCalibrator = new SolvePnpOperation();
+			_stereoExtrinsicsCalibrator = new StereoCalibrateOperation();
 
 			// Prepare OpenCV.
 			_noDistCoeffs = new MatOfDouble( new double[] { 0, 0, 0, 0 } );
@@ -460,7 +460,7 @@ namespace TrackingTools
 			_stableSampleMeterFillImage.fillAmount = _stableFrameCount / (float) _stableSampleCountThreshold;
 			_previewFlasher.Update();
 			if( _previewFlasher.changed ) _circlePatternBoardMaterial.color = Color.Lerp( Color.white, Color.black, _previewFlasher.value );
-			if( _intrinsicsErrorText.gameObject.activeSelf ) _intrinsicsErrorText.text = _projectorIntrinsicsCalibrator.rmsError.ToString( "F2" );
+			if( _intrinsicsErrorText.gameObject.activeSelf ) _intrinsicsErrorText.text = _projectorIntrinsicsCalibrator.rmsErrorResult.ToString( "F2" );
 			if( _extrinsicsErrorText.gameObject.activeSelf ) _extrinsicsErrorText.text = foundCirclePattern ? ( _extrinsicsErrorAvgM * 100f ).ToString( "F2" ) : "-"; // Cm
 			_undoSampleButton.gameObject.SetActive( sampleCount > blindSampleCountTarget && _state != State.Testing );
 
@@ -497,30 +497,28 @@ namespace TrackingTools
 			_cameraIntrinsics.ApplyToUnityCamera( _mainCamera );
 
 			// Get resolution of projector.
-			int projWidth, projHeight;
+			Vector2Int projResolution;
 			int projectorTargetDisplayIndex = _projectorCamera.targetDisplay;
 			List<DisplayInfo> displayInfos = new List<DisplayInfo>();
 			Screen.GetDisplayLayout( displayInfos );
 			if( projectorTargetDisplayIndex < displayInfos.Count ) {
 				DisplayInfo projDisplay = displayInfos[ projectorTargetDisplayIndex ];
-				projWidth = projDisplay.width;
-				projHeight = projDisplay.height;
+				projResolution = new Vector2Int( projDisplay.width, projDisplay.height );
 			} else {
 				// Fallback.
-				projWidth = camWidth;
-				projHeight = camHeight;
+				projResolution = new Vector2Int( camWidth, camHeight );
 			}
-			Debug.Log( $"{logPrepend} Projector resolution: {projWidth} x {projHeight}.\n" );
+			Debug.Log( $"{logPrepend} Projector resolution: {projResolution.x} x {projResolution.y}.\n" );
 
 			// Ensure that camera has right aspect.
-			float projectorAspect = projWidth / (float) projHeight;
+			float projectorAspect = projResolution.x / (float) projResolution.y;
 			_projectorCamera.usePhysicalProperties = true;
 			_projectorCamera.gateFit = Camera.GateFitMode.None;
 			_projectorCamera.orthographic = false;
 			_projectorCamera.sensorSize = new Vector2( _projectorCamera.sensorSize.y * projectorAspect, _projectorCamera.sensorSize.y );
 
 			// Create projector calibrator
-			_projectorIntrinsicsCalibrator = new IntrinsicsCalibrator( projWidth, projHeight );
+			_projectorIntrinsicsCalibrator = new CalibrateCameraOperation( projResolution );
 
 			// Create textures.
 			_camTexGrayMat = new Mat( camHeight, camWidth, CvType.CV_8UC1 );
@@ -606,7 +604,7 @@ namespace TrackingTools
 			for( int p = 0; p < _circlePatternPointCount; p++ ) {
 				Vector3 worldPoint = _circlePatternRenderedWorldPoints.ReadVector3( p );
 				Vector3 viewportPoint = _projectorCamera.WorldToViewportPoint( worldPoint );
-				Vector2 imagePoint = new Vector2( viewportPoint.x * _projectorIntrinsicsCalibrator.textureWidth, ( 1 - viewportPoint.y ) * _projectorIntrinsicsCalibrator.textureHeight ); // Viewport space has zero at bottom-left, image space (opencv) has zero at top-left. So flip y.
+				Vector2 imagePoint = new Vector2( viewportPoint.x * _projectorIntrinsicsCalibrator.resolutionX, ( 1 - viewportPoint.y ) * _projectorIntrinsicsCalibrator.resolutionY ); // Viewport space has zero at bottom-left, image space (opencv) has zero at top-left. So flip y.
 				_circlePatternProjectorRenderImagePoints.WriteVector2( imagePoint, p );
 			}
 
@@ -666,15 +664,15 @@ namespace TrackingTools
 
 		void UpdateProjectorIntrinsicsAndExtrinsics()
 		{
-			_projectorIntrinsicsCalibrator.UpdateIntrinsics(
+			_projectorIntrinsicsCalibrator.Update(
 				samplesHaveDistortion : false,		// Light projectors (should) have no distortion.
-				useTextureAspect: true				// We asume that the aspect is as advertised.
+				useAspect: true				// We asume that the aspect is as advertised.
 			);
 
-			_stereoExtrinsicsCalibrator.Update( _cameraIntrinsics, _projectorIntrinsicsCalibrator.intrinsics );
+			_stereoExtrinsicsCalibrator.Update( _cameraIntrinsics, _projectorIntrinsicsCalibrator.intrinsicsResult );
 
 			// Apply.
-			_projectorIntrinsicsCalibrator.intrinsics.ApplyToUnityCamera( _projectorCamera );
+			_projectorIntrinsicsCalibrator.intrinsicsResult.ApplyToUnityCamera( _projectorCamera );
 			_stereoExtrinsicsCalibrator.extrinsics.ApplyToTransform( _projectorCamera.transform );
 		}
 
@@ -838,8 +836,8 @@ namespace TrackingTools
 		{
 			if( !string.IsNullOrEmpty( _projectorIntrinsicsFileName ) ){
 				string intrinsicsFileName = _projectorIntrinsicsFileName;
-				if( _addErrorValueToIntrinsicsFileName ) intrinsicsFileName += "_E-" + _projectorIntrinsicsCalibrator.rmsError.ToString( "F02" ).Replace( ".", "," );
-				string intrinsicsFilePath = _projectorIntrinsicsCalibrator.intrinsics.SaveToFile( intrinsicsFileName );
+				if( _addErrorValueToIntrinsicsFileName ) intrinsicsFileName += "_E-" + _projectorIntrinsicsCalibrator.rmsErrorResult.ToString( "F02" ).Replace( ".", "," );
+				string intrinsicsFilePath = _projectorIntrinsicsCalibrator.intrinsicsResult.SaveToFile( intrinsicsFileName );
 				Debug.Log( $"{logPrepend} Saved intrinsics at: {intrinsicsFilePath}\n" );
 			}
 			if( !string.IsNullOrEmpty( _projectorExtrinsicsFileName ) )

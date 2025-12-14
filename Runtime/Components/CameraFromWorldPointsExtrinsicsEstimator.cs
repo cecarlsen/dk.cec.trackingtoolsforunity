@@ -44,6 +44,9 @@ namespace TrackingTools
 		[SerializeField,Range(0f,1f)] float _virtualAlpha = 0.8f;
 		[SerializeField,Range(1f,25f)] float _physicalBrightness = 1f;
 		//[SerializeField,Tooltip("Optional")] RectTransform _containerUI;
+		[SerializeField] Color _pointIdleColor = Color.cyan;
+		[SerializeField] Color _pointFocusedColor = Color.magenta;
+		[SerializeField] Color _pointActiveColor = Color.white;
 
 		[Header("Gizmos")]
 		[SerializeField] bool _drawGizmosAlways = true;
@@ -58,7 +61,7 @@ namespace TrackingTools
 		//[Header("Other")]
 		//[SerializeField] bool _undistortOnGpu = true;
 
-		ExtrinsicsCalibrator _extrinsicsCalibrator;
+		SolvePnpOperation _extrinsicsCalibrator;
 		Intrinsics _intrinsics;
 		Flipper _flipper;
 		LensUndistorter _lensUndistorter;
@@ -98,9 +101,6 @@ namespace TrackingTools
 		//Mat _camTexGrayUndistortMat;
 		//Texture2D _undistortedCameraTexture2D;
 		
-		static readonly Color pointIdleColor = Color.cyan;
-		static readonly Color pointFocusedColor = Color.magenta;
-		static readonly Color pointActiveColor = Color.white;
 		const int worldPointTransformCountMin = 4;
 		const float mouseHitDistanceMinNormalized = 0.2f; // Normalized to image height
 
@@ -226,7 +226,7 @@ namespace TrackingTools
 			//	return;
 			//}
 
-			_extrinsicsCalibrator = new ExtrinsicsCalibrator();
+			_extrinsicsCalibrator = new SolvePnpOperation();
 
 			// Create UI.
 			//if( !_containerUI ) {
@@ -454,7 +454,7 @@ namespace TrackingTools
 			if( _isPointActive ){
 				// Check for deselection.
 				if( Mouse.current.leftButton.wasReleasedThisFrame && _focusedPointIndex != -1){
-					_userPointImages[_focusedPointIndex].color = pointFocusedColor;
+					_userPointImages[_focusedPointIndex].color = _pointFocusedColor;
 					_isPointActive = false;
 				} 
 			} else {
@@ -476,18 +476,18 @@ namespace TrackingTools
 					if( _focusedPointIndex != -1 ){
 						if( Mouse.current.leftButton.wasPressedThisFrame ) {
 							// Make active.
-							_userPointImages[nearestPointIndex].color = pointActiveColor;
+							_userPointImages[nearestPointIndex].color = _pointActiveColor;
 							_mouseHitAnchoredPosition = mouseAnchoredPos;
 							_isPointActive = true;
 						} else {
 							// Indicate focused.
-							_userPointImages[nearestPointIndex].color = pointFocusedColor;
+							_userPointImages[nearestPointIndex].color = _pointFocusedColor;
 						}
 					}
 				} else if( _focusedPointIndex != -1 ){
 					// Defocus.
 					_isPointActive = false;
-					_userPointImages[ _focusedPointIndex ].color = pointIdleColor;
+					_userPointImages[ _focusedPointIndex ].color = _pointIdleColor;
 				}
 				_focusedPointIndex = nearestPointIndex;
 			}

@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 62bfcdd4987f81747a45b49dc775701d
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - _canvas: {instanceID: 0}
+  - _anchor: {instanceID: 0}
+  - _texture: {instanceID: 0}
+  - _targetCameraTransform: {instanceID: 0}
+  - _font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

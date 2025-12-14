@@ -8,7 +8,7 @@ using OpenCVForUnity.Calib3dModule;
 
 namespace TrackingTools
 {
-	public class ExtrinsicsCalibrator
+	public class SolvePnpOperation
 	{
 		Extrinsics _extrinsics;
 
@@ -24,7 +24,7 @@ namespace TrackingTools
 		public bool isValid { get { return _isValid; } }
 
 
-		public ExtrinsicsCalibrator()
+		public SolvePnpOperation()
 		{
 			_noDistCoeffs = new MatOfDouble( new double[5] );
 			_rotationVecMat = new Mat();
@@ -54,7 +54,7 @@ namespace TrackingTools
 			);
 
 			if( _isValid ) {
-				_extrinsics.UpdateFromOpenCvSolvePnp( _rotationVecMat, _translationVecMat );
+				_extrinsics.UpdateFromOpenCv( _rotationVecMat, _translationVecMat );
 			} else {
 				UnityEngine.Debug.LogWarning( "Calib3d.solvePnP failed\n" );
 			}

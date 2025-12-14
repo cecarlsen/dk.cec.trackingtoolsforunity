@@ -38,8 +38,8 @@ namespace TrackingTools
 
 		State _state = State.Initiating;
 
-		IntrinsicsCalibrator _intrinsicsCalibrator;
-		ExtrinsicsCalibrator _extrinsicsCalibrator;
+		CalibrateCameraOperation _intrinsicsCalibrator;
+		SolvePnpOperation _extrinsicsCalibrator;
 
 		Mat _camTexMat;
 		Mat _camTexGrayMat;
@@ -105,7 +105,7 @@ namespace TrackingTools
 			_chessPatternPointCount = _checkerboard.checkerPatternSize.x * _checkerboard.checkerPatternSize.y;
 
 			// Prepare OpenCV.
-			_extrinsicsCalibrator = new ExtrinsicsCalibrator();
+			_extrinsicsCalibrator = new SolvePnpOperation();
 			_prevChessCorners = new Vector2[ _chessPatternPointCount ];
 			_chessCornersRealModelMat = TrackingToolsHelper.CreateRealModelPatternPoints( _checkerboard.checkerPatternSize, _checkerboard.checkerTileSize, TrackingToolsHelper.PatternType.Checkerboard );
 
@@ -187,7 +187,7 @@ namespace TrackingTools
 
 			// During testing, undistort before.
 			if( _state == State.TestingAccuracy ) {
-				if( !_linearOpticalLens ) Calib3d.undistort( _camTexGrayMat, _camTexGrayUndistortMat, _intrinsicsCalibrator.sensorMat, _intrinsicsCalibrator.distortionCoeffsMat );
+				if( !_linearOpticalLens ) Calib3d.undistort( _camTexGrayMat, _camTexGrayUndistortMat, _intrinsicsCalibrator.sensorResultMat, _intrinsicsCalibrator.distortionCoeffsREsultMat );
 				else _camTexGrayMat.copyTo( _camTexGrayUndistortMat );
 			}
 
@@ -208,7 +208,7 @@ namespace TrackingTools
 			// During calibration, undistort after.
 			if( _state == State.CollectingSamples ) {
 				if( !_linearOpticalLens && _intrinsicsCalibrator.sampleCount > correctDistortionSampleCountThreshold ) {
-					Calib3d.undistort( _camTexGrayMat, _camTexGrayUndistortMat, _intrinsicsCalibrator.sensorMat, _intrinsicsCalibrator.distortionCoeffsMat );
+					Calib3d.undistort( _camTexGrayMat, _camTexGrayUndistortMat, _intrinsicsCalibrator.sensorResultMat, _intrinsicsCalibrator.distortionCoeffsREsultMat );
 				} else {
 					_camTexGrayMat.copyTo( _camTexGrayUndistortMat );
 				}
@@ -250,17 +250,17 @@ namespace TrackingTools
 
 				// Add sample.
 				_intrinsicsCalibrator.AddSample( _chessCornersRealModelMat, _chessCornersImageMat );
-				_intrinsicsCalibrator.UpdateIntrinsics( samplesHaveDistortion: !_linearOpticalLens );
+				_intrinsicsCalibrator.Update( samplesHaveDistortion: !_linearOpticalLens );
 				_previewFlasher.Start();
-				_rmsErrorText.text = _intrinsicsCalibrator.rmsError.ToString( "F3" );
+				_rmsErrorText.text = _intrinsicsCalibrator.rmsErrorResult.ToString( "F3" );
 				_stableFrameCount = 0;
 
 				// When enough samples are gathered, save to file and switch to testing mode.
 				if( _intrinsicsCalibrator.sampleCount == _desiredSampleCount )
 				{
 					string intrinsicsFileName = _intrinsicsFileName;
-					if( _addErrorValueToFileName ) intrinsicsFileName += "_E-" + _intrinsicsCalibrator.rmsError.ToString( "F02" ).Replace( ".", "," );
-					string filePath = _intrinsicsCalibrator.intrinsics.SaveToFile( intrinsicsFileName );
+					if( _addErrorValueToFileName ) intrinsicsFileName += "_E-" + _intrinsicsCalibrator.rmsErrorResult.ToString( "F02" ).Replace( ".", "," );
+					string filePath = _intrinsicsCalibrator.intrinsicsResult.SaveToFile( intrinsicsFileName );
 					SwitchState( State.TestingAccuracy );
 
 					Debug.Log( logPrepend + "Saved intrinsics to file.\n" + filePath );
@@ -274,7 +274,7 @@ namespace TrackingTools
 			_arImage.enabled = foundBoard;
 			if( !foundBoard ) return;
 
-			bool success =_extrinsicsCalibrator.UpdateExtrinsics( _chessCornersWorldMat, _chessCornersImageMat, _intrinsicsCalibrator.intrinsics );//, _intrinsicsCalibrator.textureWidth, _intrinsicsCalibrator.textureHeight );
+			bool success =_extrinsicsCalibrator.UpdateExtrinsics( _chessCornersWorldMat, _chessCornersImageMat, _intrinsicsCalibrator.intrinsicsResult );//, _intrinsicsCalibrator.textureWidth, _intrinsicsCalibrator.textureHeight );
 			if( success ) {
 				_extrinsicsCalibrator.extrinsics.ApplyToTransform( _mainCamera.transform );
 			}
@@ -294,7 +294,7 @@ namespace TrackingTools
 					// UI
 					_sampleCountMeterFillImage.transform.parent.gameObject.SetActive( false );
 					_sampleCountText.gameObject.SetActive( false );
-					_intrinsicsCalibrator.intrinsics.ApplyToUnityCamera( _mainCamera );
+					_intrinsicsCalibrator.intrinsicsResult.ApplyToUnityCamera( _mainCamera );
 					_mainCamera.gameObject.SetActive( true );
 					_arImage.gameObject.SetActive( true );
 					break;
@@ -306,29 +306,28 @@ namespace TrackingTools
 
 		void AdaptResources()
 		{
-			int w = _cameraSourceTexture.width;
-			int h = _cameraSourceTexture.height;
-			if( _processedCameraTexture != null && _processedCameraTexture.width == w && _processedCameraTexture.height == h ) return;
+			var resolution = new Vector2Int( _cameraSourceTexture.width, _cameraSourceTexture.height );
+			if( _processedCameraTexture != null && _processedCameraTexture.width == resolution.x && _processedCameraTexture.height == resolution.y ) return;
 
 			// Start over again.
 			Reset();
 
-			_intrinsicsCalibrator = new IntrinsicsCalibrator( w, h );
+			_intrinsicsCalibrator = new CalibrateCameraOperation( resolution );
 
 			// Create mats and textures.
-			_camTexGrayMat = new Mat( h, w, CvType.CV_8UC1 );
-			_camTexGrayUndistortMat = new Mat( h, w, CvType.CV_8UC1 );
-			_processedCameraTexture = new Texture2D( w, h, GraphicsFormat.R8_UNorm, 0, TextureCreationFlags.None );
+			_camTexGrayMat = new Mat( resolution.y, resolution.x, CvType.CV_8UC1 );
+			_camTexGrayUndistortMat = new Mat( resolution.y, resolution.x, CvType.CV_8UC1 );
+			_processedCameraTexture = new Texture2D( resolution.x, resolution.y, GraphicsFormat.R8_UNorm, 0, TextureCreationFlags.None );
 			_processedCameraTexture.name = "UndistortedCameraTex";
 			_processedCameraTexture.wrapMode = TextureWrapMode.Repeat;
-			_arTexture = new RenderTexture( w, h, 16, GraphicsFormat.R8G8B8A8_UNorm );
+			_arTexture = new RenderTexture( resolution.x, resolution.y, 16, GraphicsFormat.R8G8B8A8_UNorm );
 			_arTexture.name = "AR Texture";
 
 			// Change state.
 			if( _state == State.Initiating ) SwitchState( State.CollectingSamples );
 
 			// Update UI.
-			_aspectFitter.aspectRatio = w / (float) h;
+			_aspectFitter.aspectRatio = resolution.x / (float) resolution.y;
 			_processedCameraImage.texture = _processedCameraTexture;
 			_arImage.texture = _arTexture;
 			_mainCamera.targetTexture = _arTexture;

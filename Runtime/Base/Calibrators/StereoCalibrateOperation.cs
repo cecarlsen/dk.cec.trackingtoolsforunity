@@ -13,7 +13,7 @@ using OpenCVForUnity.Calib3dModule;
 
 namespace TrackingTools
 {
-	public class StereoExtrinsicsCalibrator
+	public class StereoCalibrateOperation
 	{
 		Mat _sensorMatA;
 		Mat _sensorMatB;
@@ -32,7 +32,7 @@ namespace TrackingTools
 		public Extrinsics extrinsics { get { return _extrinsics; } }
 
 
-		public StereoExtrinsicsCalibrator()
+		public StereoCalibrateOperation()
 		{
 			const int regularSampleCount = 8;
 

@@ -49,9 +49,9 @@ namespace TrackingTools
 		[SerializeField] Button _actionButton = null;
 
 
-		StereoExtrinsicsCalibrator _stereoExtrinsicsCalibrator;
+		StereoCalibrateOperation _stereoExtrinsicsCalibrator;
 		Intrinsics _intrinsicsA, _intrinsicsB;
-		ExtrinsicsCalibrator _extrinsicsCalibratorA, _extrinsicsCalibratorB;
+		SolvePnpOperation _extrinsicsCalibratorA, _extrinsicsCalibratorB;
 
 		Mat _sensorMatA, _sensorMatB;
 		MatOfDouble _distortionCoeffsMatA, _distortionCoeffsMatB;
@@ -150,9 +150,9 @@ namespace TrackingTools
 			_chessCornersImageSamplesMatA = new List<Mat>();
 			_chessCornersImageSamplesMatB = new List<Mat>();
 
-			_stereoExtrinsicsCalibrator = new StereoExtrinsicsCalibrator();
-			_extrinsicsCalibratorA = new ExtrinsicsCalibrator();
-			_extrinsicsCalibratorB = new ExtrinsicsCalibrator();
+			_stereoExtrinsicsCalibrator = new StereoCalibrateOperation();
+			_extrinsicsCalibratorA = new SolvePnpOperation();
+			_extrinsicsCalibratorB = new SolvePnpOperation();
 
 			TrackingToolsHelper.RenderPattern( _checkerboard.checkerPatternSize, TrackingToolsHelper.PatternType.Checkerboard, 1024, ref _chessPatternTexture, ref _patternRenderMaterial );
 
@@ -270,7 +270,7 @@ namespace TrackingTools
 		void UpdatePreviewForCamera
 		(
 			Texture cameraSourceTexture, Intrinsics intrinsics, bool flipSourceTextureVertically, float _conversionFactorFor16BitTexture, bool normalizeSourceTexture, Camera targetCmaera, RawImage arImage, Texture2D processedCameraTexture, ref bool foundBoard,
-			ref Color32[] tempTransferColors, Texture2D tempTransferTexture, ref Mat camTexMat, ref MatOfPoint2f chessCornersImageMat, Mat camTexGrayMat, Mat camTexGrayUndistortMat, Mat undistortMap1, Mat undistortMap2, ExtrinsicsCalibrator extrinsicsCalibrator, bool findAndApplyExtrinsics
+			ref Color32[] tempTransferColors, Texture2D tempTransferTexture, ref Mat camTexMat, ref MatOfPoint2f chessCornersImageMat, Mat camTexGrayMat, Mat camTexGrayUndistortMat, Mat undistortMap1, Mat undistortMap2, SolvePnpOperation extrinsicsCalibrator, bool findAndApplyExtrinsics
 		) {
 			// Update mat texture (If the texture looks correct in Unity, then it needs to be flipped for OpenCV).
 			TrackingToolsHelper.TextureToMat( cameraSourceTexture, !flipSourceTextureVertically, ref camTexMat, ref tempTransferColors, ref tempTransferTexture );

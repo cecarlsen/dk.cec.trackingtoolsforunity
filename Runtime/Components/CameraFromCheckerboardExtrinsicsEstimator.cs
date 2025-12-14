@@ -48,7 +48,7 @@ namespace TrackingTools
 
 
 		Intrinsics _intrinsics;
-		ExtrinsicsCalibrator _extrinsicsCalibrator;
+		SolvePnpOperation _extrinsicsCalibrator;
 
 		Mat _sensorMat;
 		MatOfDouble _distortionCoeffsMat;
@@ -107,7 +107,7 @@ namespace TrackingTools
 			_undistortMap1 = new Mat();
 			_undistortMap2 = new Mat();
 
-			_extrinsicsCalibrator = new ExtrinsicsCalibrator();
+			_extrinsicsCalibrator = new SolvePnpOperation();
 
 			TrackingToolsHelper.RenderPattern( _calibrationBoard.checkerPatternSize, TrackingToolsHelper.PatternType.Checkerboard, 1024, ref _chessPatternTexture, ref _patternRenderMaterial );
 
