@@ -17,8 +17,12 @@ namespace TrackingTools
 	public class CalibrateCameraOperation
 	{
 		Size _resolutionSize;
-		List<Mat> _patternRealSamples;
+		List<Mat> _patternWorldSamples;
 		List<Mat> _patternImageSamples;
+		MatOfPoint3f _pointsWorldMat;
+		MatOfPoint2f _pointsImageMat;
+		float[] _vec3Array = new float[3];
+		float[] _vec2Array = new float[2];
 
 		Mat _sensorResultMat;
 		MatOfDouble _distortionCoeffsResultMat;
@@ -33,7 +37,7 @@ namespace TrackingTools
 		public int resolutionX => (int) _resolutionSize.width;
 		public int resolutionY => (int) _resolutionSize.height;
 		public Vector2Int resolution => new Vector2Int( (int) _resolutionSize.width, (int) _resolutionSize.height );
-		public int sampleCount => _patternRealSamples.Count;
+		public int sampleCount => _patternWorldSamples.Count;
 		
 		public bool hasResult => _hasResult;
 		public Mat sensorResultMat => _sensorResultMat;
@@ -50,7 +54,7 @@ namespace TrackingTools
 
 			_intrinsicsResult = new Intrinsics();
 			_patternImageSamples = new List<Mat>( defaultSampleCount );
-			_patternRealSamples = new List<Mat>( defaultSampleCount );
+			_patternWorldSamples = new List<Mat>( defaultSampleCount );
 			_distortionCoeffsResultMat = new MatOfDouble();
 			_rotationResults = new List<Mat>( defaultSampleCount );
 			_translationResults = new List<Mat>( defaultSampleCount );
@@ -72,14 +76,54 @@ namespace TrackingTools
 			//Debug.Log( "patternRealModelSample\n" + patternRealModelSample.dump() );
 			//Debug.Log( "patternImageSample\n" + patternImageSample.dump() );
 
-			_patternRealSamples.Add( patternRealModelSample.clone() );
+			_patternWorldSamples.Add( patternRealModelSample.clone() );
 			_patternImageSamples.Add( patternImageSample.clone() );
+		}
+
+
+		
+
+		/// <summary>
+		/// Add a pair of real space + image space points.
+		/// Beware that calibration can fail if pattern is not rotated to face forward, so that z is zero.
+		/// Also ensure that the point order in the the two point sets are matching.
+		/// </summary>
+		/// <param name="patternRealModelSample">Must be measured in millimeters</param>
+		/// <param name="patternImageSample"></param>
+		public void AddSample( IList<Vector3> patternRealModelSample, IList<Vector2> patternImageSample )
+		{
+			int count = patternRealModelSample.Count;
+			if( _pointsWorldMat == null || _pointsWorldMat.rows() != count ){
+				if( _pointsWorldMat != null ) _pointsWorldMat.release();
+				if( _pointsImageMat != null ) _pointsImageMat.release();
+				_pointsWorldMat = new MatOfPoint3f();
+				_pointsImageMat = new MatOfPoint2f();
+				_pointsWorldMat.alloc( count );
+				_pointsImageMat.alloc( count );
+			}
+
+			for( int p = 0; p < count; p++ )
+			{
+				var worldPoint = patternRealModelSample[p];
+				var imagePoint = patternImageSample[p];
+				for( int i = 0; i < _vec3Array.Length; i++ )_vec3Array[i] = worldPoint[i];
+				for( int i = 0; i < _vec2Array.Length; i++ )_vec2Array[i] = imagePoint[i];
+				_pointsWorldMat.put( p, 0, _vec3Array );
+				_pointsImageMat.put( p, 0, _vec2Array );
+				//Debug.Log( $"World Point {p}: {posWorld}" );
+				//Debug.Log( $"Image Point {p}: {posImage}" );
+			}
+
+			_patternWorldSamples.Add( _pointsWorldMat.clone() );
+			_patternImageSamples.Add( _pointsImageMat.clone() );
 		}
 
 
 		public void ClearSamples()
 		{
-			_patternRealSamples.Clear();
+			foreach( Mat mat in _patternImageSamples ) mat.release();
+			foreach( Mat mat in _patternWorldSamples ) mat.release();
+			_patternWorldSamples.Clear();
 			_patternImageSamples.Clear();
 		}
 
@@ -92,7 +136,7 @@ namespace TrackingTools
 
 		public bool Update( bool samplesHaveDistortion = true, bool useAspect = false, Intrinsics intrinsicGuess = null )
 		{
-			if( _patternRealSamples.Count == 0 ||  _patternImageSamples.Count == 0 ) return false;
+			if( _patternWorldSamples.Count == 0 ||  _patternImageSamples.Count == 0 ) return false;
 
 			int flags = 0;
 
@@ -125,7 +169,7 @@ namespace TrackingTools
 			// Example: https://forum.unity.com/threads/released-opencv-for-unity.277080/page-8#post-2348856
 			//var terminationCriteria = new TermCriteria( TermCriteria.EPS + TermCriteria.MAX_ITER, 60, 0.001 );
 			_rmsErrorResult = (float) Calib3d.calibrateCamera(
-				_patternRealSamples, _patternImageSamples, _resolutionSize,
+				_patternWorldSamples, _patternImageSamples, _resolutionSize,
 				_sensorResultMat, _distortionCoeffsResultMat, _rotationResults, _translationResults, // Out.
 				flags //, terminationCriteria // Using termination critera screws up projector calibration.
 			);
@@ -142,7 +186,7 @@ namespace TrackingTools
 			// Update Unity friendly objects.
 			_intrinsicsResult.UpdateFromOpenCV( _sensorResultMat, _distortionCoeffsResultMat, new Vector2Int( resolutionX, resolutionY ), _rmsErrorResult );
 			_extrinsicsResults.Clear();
-			for( int i = 0; i < _patternRealSamples.Count; i++ ){
+			for( int i = 0; i < _patternWorldSamples.Count; i++ ){
 				var extrinsics = new Extrinsics();
 				extrinsics.UpdateFromOpenCv( _rotationResults[i], _translationResults[i] );
 				_extrinsicsResults.Add( extrinsics );
@@ -156,11 +200,13 @@ namespace TrackingTools
 		public void Release()
 		{
 			foreach( Mat mat in _patternImageSamples ) mat.release();
-			foreach( Mat mat in _patternRealSamples ) mat.release();
+			foreach( Mat mat in _patternWorldSamples ) mat.release();
 			foreach( Mat mat in _rotationResults ) mat.release();
 			foreach( Mat mat in _translationResults ) mat.release();
+			_pointsWorldMat.release();
+			_pointsImageMat.release();
 			_patternImageSamples.Clear();
-			_patternRealSamples.Clear();
+			_patternWorldSamples.Clear();
 			_rotationResults.Clear();
 			_translationResults.Clear();
 		}

@@ -26,14 +26,13 @@ namespace TrackingTools
 
 		[Header("UI")]
 		[SerializeField,Tooltip("The pixel resolution of this camera will be used.")] Camera _projectorCamera = null;
-		[SerializeField] Canvas _canvas = null;
+		[SerializeField] RectTransform _canvasContainerRect;
 		[SerializeField] Key _interactableHotKey = Key.Digit1;
 		[SerializeField] Key _resetHotKey = Key.Backspace;
 		[SerializeField] Key _precisionHoldHotKey = Key.LeftCtrl;
 		[SerializeField] Font _font = null;
 		[SerializeField] int _fontSize = 12;
 		[SerializeField,Range(0f,1f)] float _virtualAlpha = 0.8f;
-		[SerializeField,Tooltip("Optional")] RectTransform _containerRect;
 		[SerializeField] Color _pointIdleColor = Color.cyan;
 		[SerializeField] Color _pointFocusedColor = Color.magenta;
 		[SerializeField] Color _pointActiveColor = Color.yellow;
@@ -51,15 +50,18 @@ namespace TrackingTools
 		bool _dirtyCalibration = true;
 		
 		// UI.
+		Canvas _canvas;
 		RectTransform[] _userPointRects;
 		Image[] _userPointImages;
 		int _focusedPointIndex = -1;
 		bool _isPointActive;
 		Vector2 _mouseHitAnchoredPosition;
+		Vector3[] _worldPoints;
+		Vector2[] _imagePoints;
 
 		// OpenCV.
-		MatOfPoint2f _calibrationPointsImageMat;
-		MatOfPoint3f _calibrationPointsWorldMat;
+		//MatOfPoint2f _calibrationPointsImageMat;
+		//MatOfPoint3f _calibrationPointsWorldMat;
 
 		const float mouseHitDistanceMinNormalized = 0.2f; // Normalized to image height
 		
@@ -84,7 +86,7 @@ namespace TrackingTools
 		}
 
 
-		public void OverrideCalibrationPointTransforms( Transform[] transforms )
+		public void SetWorldPointTransforms( Transform[] transforms )
 		{
 			if( transforms == null ) return;
 			if( Application.isPlaying ){
@@ -139,23 +141,27 @@ namespace TrackingTools
 				return;
 			}
 
+			_canvas = _canvasContainerRect.GetComponentInParent<Canvas>();
+
 			int pointCount = _worldPointTransforms.Length;
+			_worldPoints = new Vector3[ pointCount ];
+			_imagePoints = new Vector2[ pointCount ];
 
 			_intrinsicGuess = new Intrinsics();
 			_intrinsicGuess.UpdateFromUnityCamera( _projectorCamera );
 
 			// Create UI.
-			if( !_containerRect ) {
-				_containerRect = new GameObject( "CameraPoser" ).AddComponent<RectTransform>();
-				_containerRect.transform.SetParent( _canvas.transform );
+			if( !_canvasContainerRect ) {
+				_canvasContainerRect = new GameObject( "CameraPoser" ).AddComponent<RectTransform>();
+				_canvasContainerRect.transform.SetParent( _canvas.transform );
 			}
-			ExpandRectTransform( _containerRect );
+			ExpandRectTransform( _canvasContainerRect );
 			_userPointRects = new RectTransform[pointCount];
 			_userPointImages = new Image[pointCount];
 			for( int p = 0; p < pointCount; p++ )
 			{
 				GameObject pointObject = new GameObject( "Point" + p );
-				pointObject.transform.SetParent( _containerRect );
+				pointObject.transform.SetParent( _canvasContainerRect );
 				Image pointImage = pointObject.AddComponent<Image>();
 				pointImage.color = Color.cyan;
 				RectTransform pointRect = pointObject.GetComponent<RectTransform>();
@@ -179,10 +185,10 @@ namespace TrackingTools
 			TryLoadCalibrationPoints();
 
 			// Prepare OpenCV.
-			_calibrationPointsImageMat = new MatOfPoint2f();
-			_calibrationPointsWorldMat = new MatOfPoint3f();
-			_calibrationPointsImageMat.alloc( pointCount );
-			_calibrationPointsWorldMat.alloc( pointCount );
+			//_calibrationPointsImageMat = new MatOfPoint2f(());
+			//_calibrationPointsWorldMat = new MatOfPoint3f();
+			//_calibrationPointsImageMat.alloc( pointCount );
+			//_calibrationPointsWorldMat.alloc( pointCount );
 
 			// Update variables.
 			OnValidate();
@@ -203,8 +209,8 @@ namespace TrackingTools
 			// CLean up after the party.
 			foreach( var pointRect in _userPointRects ) if( pointRect?.gameObject ) Destroy( pointRect.gameObject );
 			_operation?.Release();
-			_calibrationPointsImageMat?.Dispose();
-			_calibrationPointsWorldMat?.Dispose();
+			//_calibrationPointsImageMat?.Dispose();
+			//_calibrationPointsWorldMat?.Dispose();
 
 			_isPointActive = false;
 			_focusedPointIndex = -1;
@@ -399,15 +405,17 @@ void UpdateInteraction()
 				posImage.y = 1f - posImage.y; // OpenCv pixels are flipped vertically.
 				//posImage.x = 1f - posImage.x;
 				posImage.Scale( _operation.resolution );
-				Vector3 posWorld = _worldPointTransforms[ p ].position;
-				_calibrationPointsWorldMat.put( p, 0, new double[]{ posWorld.x, posWorld.y, posWorld.z } );
-				_calibrationPointsImageMat.put( p, 0, new double[]{ posImage.x, posImage.y } );
+				_imagePoints[ p ] = posImage;
+				_worldPoints[ p ] = _worldPointTransforms[ p ].position;
+				//Vector3 posWorld = _worldPointTransforms[ p ].position;
+				//_calibrationPointsWorldMat.put( p, 0, new double[]{ posWorld.x, posWorld.y, posWorld.z } );
+				//_calibrationPointsImageMat.put( p, 0, new double[]{ posImage.x, posImage.y } );
 				//Debug.Log( $"World Point {p}: {posWorld}" );
 				//Debug.Log( $"Image Point {p}: {posImage}" );
 			}
 
 			_operation.ClearSamples();
-			_operation.AddSample( _calibrationPointsWorldMat, _calibrationPointsImageMat );
+			_operation.AddSample( _worldPoints, _imagePoints );
 			_operation.Update( samplesHaveDistortion: false, useAspect: true, _intrinsicGuess );
 			
 			// Apply.
