@@ -168,6 +168,7 @@ namespace TrackingTools
 
 		public void Release()
 		{
+			if( RenderTexture.active == _undistortionMap ) RenderTexture.active = null;
 			_undistortionMap?.Release();
 			_constantBuffer?.Release();
 			if( _material ) Object.Destroy( _material );

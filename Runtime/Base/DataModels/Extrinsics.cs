@@ -48,6 +48,12 @@ namespace TrackingTools
 		}
 
 
+		public void FlipYRotation180()
+		{
+			rotation *= Quaternion.Euler( 0, 180, 0 );
+		}
+
+
 		public static string FileNameToFilePath( string fileName )
 		{
 			string filePath = TrackingToolsConstants.extrinsicsDirectoryPath + "/" + fileName;

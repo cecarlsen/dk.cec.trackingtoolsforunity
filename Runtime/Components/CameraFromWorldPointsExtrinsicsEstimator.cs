@@ -248,7 +248,8 @@ namespace TrackingTools
 			_uiMaterial.SetColor( "_BurnoutColor", new Color( 0.5f, 0f, 0f, 1f ) );
 			_aspectFitterUI = _containerRect.gameObject.GetComponent<AspectRatioFitter>();
 			if( !_aspectFitterUI ) _aspectFitterUI = _containerRect.gameObject.AddComponent<AspectRatioFitter>();
-			_aspectFitterUI.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
+			//_aspectFitterUI.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
+			_aspectFitterUI.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
 			//ExpandRectTransform( _containerRect );
 			ExpandRectTransform( _physicalCameraImageRect );
 

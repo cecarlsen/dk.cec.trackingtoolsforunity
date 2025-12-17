@@ -189,6 +189,7 @@ namespace TrackingTools
 			for( int i = 0; i < _patternWorldSamples.Count; i++ ){
 				var extrinsics = new Extrinsics();
 				extrinsics.UpdateFromOpenCv( _rotationResults[i], _translationResults[i] );
+				extrinsics.FlipYRotation180(); // Not sure why we need to do this. But then it fits =/
 				_extrinsicsResults.Add( extrinsics );
 			}
 

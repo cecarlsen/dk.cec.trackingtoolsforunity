@@ -348,6 +348,23 @@ namespace TrackingTools
 		}
 
 
+
+		/// <summary>
+		/// Update intrinsic values from a projector.
+		/// </summary>
+		public void UpdateFromProjectorParameters( float throwRatio, Vector2Int resolution, Vector2 lensshift = new Vector2() )
+		{
+			_resolution = resolution;
+
+			LensShiftToPrincipalPoint( lensshift, _resolution, out _cx, out _cy ); // Note that this will flip shift y to convert from Unity to OpenCV camera space.
+			GetDerivedFocalLengths( throwRatio, _resolution, out _fx, out _fy );
+
+			_distortionCoeffs = new double[ defaultDistortionCoeffCount ]; // No distortion.
+
+			_rmsError = 0; // No error.
+		}
+
+
 		/// <summary>
 		/// Apply intrinsic values to a unity camera.
 		/// </summary>
@@ -474,6 +491,14 @@ namespace TrackingTools
 		{
 			fx = resolution.x * focalLength / sensorSize.x;
 			fy = resolution.y * focalLength / sensorSize.y;
+		}
+
+
+		public static void GetDerivedFocalLengths( float throwRatio, Vector2Int resolution, out double fx, out double fy )
+		{
+			// Assuming square pixels.
+			fx = resolution.x * throwRatio;
+			fy = resolution.y * throwRatio * ( resolution.x / (float) resolution.y );
 		}
 
 

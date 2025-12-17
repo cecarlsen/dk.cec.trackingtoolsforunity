@@ -1,6 +1,11 @@
 ﻿/*
 	Copyright © Carl Emil Carlsen 2025
 	http://cec.dk
+
+	Projector calibration using OpenCV calibrateCamera() function. Given a known geometry we feed two sets of points to the function,
+	one set in world space, and one in image space.
+
+	This is essentially what tools like Mapamok (Kyle McDonald) and camSchnappr (TouchDesigner) does.
 */
 
 using System.IO;
@@ -9,6 +14,7 @@ using UnityEngine.UI;
 using OpenCVForUnity.CoreModule;
 using System;
 using UnityEngine.InputSystem;
+using UnityEngine.Experimental.Rendering;
 
 namespace TrackingTools
 {
@@ -17,6 +23,10 @@ namespace TrackingTools
 		[SerializeField] bool _interactable = false;
 		
 		[Header("Input")]
+		[SerializeField,Tooltip("Used for calibrateCamere() intrinsic guess.")] float _throwRatioGuess = 1.2f;
+		[SerializeField,Tooltip("Used for calibrateCamere() intrinsic guess.")] Vector2 _lensshiftGuess = Vector2.zero;
+		[SerializeField,Tooltip("Used for initial point positioning.")] Transform _extrinsicGuess = null;
+		[SerializeField] Vector2Int _resolution = new Vector2Int( 1920, 1080 );
 		[SerializeField] Transform[] _worldPointTransforms = null;
 
 		[Header("Output")]
@@ -25,8 +35,9 @@ namespace TrackingTools
 		[SerializeField,Tooltip("Without extension name (.json)")] string _projectorExtrinsicsFileName = "DefaultProjector";
 
 		[Header("UI")]
-		[SerializeField,Tooltip("The pixel resolution of this camera will be used.")] Camera _projectorCamera = null;
+		[SerializeField] Camera _calibrationCamera = null;
 		[SerializeField] RectTransform _canvasContainerRect;
+		[SerializeField] Text _rmsErrorText;
 		[SerializeField] Key _interactableHotKey = Key.Digit1;
 		[SerializeField] Key _resetHotKey = Key.Backspace;
 		[SerializeField] Key _precisionHoldHotKey = Key.LeftCtrl;
@@ -42,26 +53,31 @@ namespace TrackingTools
 		[SerializeField] bool _drawPointIndexLabelGizmos = true;
 		[SerializeField] Vector3 _pointLabelOffset = Vector3.zero;
 		[SerializeField] bool _drawPointGizmos = true;
-		[SerializeField] float _pointGizmoRadius = 0.005f;
+		[SerializeField] Color _gizmoColor = Color.white;
+		[SerializeField] float _gizmoPointRadius = 0.005f;
 
 		CalibrateCameraOperation _operation;
 		Intrinsics _intrinsicGuess;
 
 		bool _dirtyCalibration = true;
+		int _controlDisplayIndex;
+
+		RenderTexture _calibrationTexture = null;
 		
 		// UI.
 		Canvas _canvas;
+		AspectRatioFitter _aspectFitter;
 		RectTransform[] _userPointRects;
 		Image[] _userPointImages;
+		RawImage _calibrationImage;
 		int _focusedPointIndex = -1;
 		bool _isPointActive;
 		Vector2 _mouseHitAnchoredPosition;
 		Vector3[] _worldPoints;
 		Vector2[] _imagePoints;
 
-		// OpenCV.
-		//MatOfPoint2f _calibrationPointsImageMat;
-		//MatOfPoint3f _calibrationPointsWorldMat;
+		Color _cameraInitialBackgroundColor;
+		bool _cameraInitialActiveState;
 
 		const float mouseHitDistanceMinNormalized = 0.2f; // Normalized to image height
 		
@@ -77,6 +93,18 @@ namespace TrackingTools
 		public float alpha {
 			get { return _virtualAlpha; }
 			set { _virtualAlpha = Mathf.Clamp01( value ); }
+		}
+
+		public Vector2Int resolution
+		{
+			get { return _resolution; }
+			set {
+				_resolution = value;
+				if( _calibrationTexture && ( _calibrationTexture.width != _resolution.x || _calibrationTexture.height != _resolution.y ) ){
+					RecreateCalibrationTexture();
+					_dirtyCalibration = true;
+				}
+			}
 		}
 
 
@@ -106,7 +134,7 @@ namespace TrackingTools
 		{
 			int pointCount = _worldPointTransforms.Length;
 			for( int p = 0; p < pointCount; p++ ) {
-				Vector2 viewportPoint = _projectorCamera.WorldToViewportPoint( _worldPointTransforms[ p ].position );
+				Vector2 viewportPoint = _calibrationCamera.WorldToViewportPoint( _worldPointTransforms[ p ].position );
 				SetAnchoredPosition( _userPointRects[ p ], viewportPoint );
 			}
 			_dirtyCalibration = true;
@@ -119,7 +147,6 @@ namespace TrackingTools
 		public void SetPhysicalCameraIntrinsicsFileName( string physicalCameraIntrinsicsFileName )
 		{
 			_projectorIntrinsicsFileName = physicalCameraIntrinsicsFileName;
-			//TryLoadPhysicalCameraIntrinsics();
 		}
 
 
@@ -136,26 +163,42 @@ namespace TrackingTools
 		void OnEnable()
 		{
 			if( _worldPointTransforms == null || _worldPointTransforms.Length < 3 ){
-				Debug.LogWarning( logPrepend + "World points missing. At least three is required.\n" );
+				Debug.LogWarning( $"{logPrepend} Abort. World points missing. At least three is required.\n" );
 				enabled = false;
 				return;
 			}
 
 			_canvas = _canvasContainerRect.GetComponentInParent<Canvas>();
+			_controlDisplayIndex = _canvas.targetDisplay;
 
 			int pointCount = _worldPointTransforms.Length;
 			_worldPoints = new Vector3[ pointCount ];
 			_imagePoints = new Vector2[ pointCount ];
 
 			_intrinsicGuess = new Intrinsics();
-			_intrinsicGuess.UpdateFromUnityCamera( _projectorCamera );
+			_intrinsicGuess.UpdateFromProjectorParameters( _throwRatioGuess, _resolution, _lensshiftGuess );
+			_intrinsicGuess.ApplyToUnityCamera( _calibrationCamera );
+
+			_calibrationCamera.transform.position = _extrinsicGuess.position;
+			_calibrationCamera.transform.rotation = _extrinsicGuess.rotation;
 
 			// Create UI.
 			if( !_canvasContainerRect ) {
 				_canvasContainerRect = new GameObject( "CameraPoser" ).AddComponent<RectTransform>();
 				_canvasContainerRect.transform.SetParent( _canvas.transform );
 			}
+
 			ExpandRectTransform( _canvasContainerRect );
+			
+			_aspectFitter = _canvasContainerRect.gameObject.AddComponent<AspectRatioFitter>();
+			_aspectFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+			_aspectFitter.aspectRatio = _resolution.x / (float) _resolution.y;
+			
+			_calibrationImage = new GameObject("CalibrationTexture").AddComponent<RawImage>();
+			_calibrationImage.transform.SetParent( _canvasContainerRect );
+			ExpandRectTransform( _calibrationImage.rectTransform );
+			
+
 			_userPointRects = new RectTransform[pointCount];
 			_userPointImages = new Image[pointCount];
 			for( int p = 0; p < pointCount; p++ )
@@ -178,17 +221,16 @@ namespace TrackingTools
 				_userPointImages[p] = pointImage;
 			}
 
+			RecreateCalibrationTexture();
 			ResetImageCalibrationPoints();
 
-			// Load files.
-			//TryLoadPhysicalCameraIntrinsics();
-			TryLoadCalibrationPoints();
+			_cameraInitialBackgroundColor = _calibrationCamera.backgroundColor;
+			_calibrationCamera.backgroundColor = Color.black;
+			_cameraInitialActiveState = _calibrationCamera.gameObject.activeSelf;
+			_calibrationCamera.gameObject.SetActive( true );
 
-			// Prepare OpenCV.
-			//_calibrationPointsImageMat = new MatOfPoint2f(());
-			//_calibrationPointsWorldMat = new MatOfPoint3f();
-			//_calibrationPointsImageMat.alloc( pointCount );
-			//_calibrationPointsWorldMat.alloc( pointCount );
+			// Load files.
+			TryLoadCalibrationPoints();
 
 			// Update variables.
 			OnValidate();
@@ -209,8 +251,15 @@ namespace TrackingTools
 			// CLean up after the party.
 			foreach( var pointRect in _userPointRects ) if( pointRect?.gameObject ) Destroy( pointRect.gameObject );
 			_operation?.Release();
-			//_calibrationPointsImageMat?.Dispose();
-			//_calibrationPointsWorldMat?.Dispose();
+			Destroy( _aspectFitter );
+			_calibrationTexture?.Release();
+
+			_calibrationTexture = null;
+
+			_calibrationCamera.targetTexture = null;
+
+			_calibrationCamera.backgroundColor = _cameraInitialBackgroundColor;
+			_calibrationCamera.gameObject.SetActive( _cameraInitialActiveState );
 
 			_isPointActive = false;
 			_focusedPointIndex = -1;
@@ -219,9 +268,9 @@ namespace TrackingTools
 
 		void Update()
 		{
-			if( !_projectorCamera ) return;
+			if( !_calibrationCamera ) return;
 
-			var resolution = new Vector2Int( _projectorCamera.pixelWidth, _projectorCamera.pixelHeight );
+			var resolution = new Vector2Int( _calibrationCamera.pixelWidth, _calibrationCamera.pixelHeight );
 			if( _operation == null ){
 				_operation = new CalibrateCameraOperation( resolution );
 			} else if( _operation.resolution != resolution ){
@@ -229,7 +278,7 @@ namespace TrackingTools
 				_dirtyCalibration = true;
 			}
 
-			if( Keyboard.current[_interactableHotKey].wasPressedThisFrame ) interactable = !interactable;
+			if( _interactableHotKey != Key.None && Keyboard.current[_interactableHotKey].wasPressedThisFrame ) interactable = !interactable;
 
 			if( _interactable ) UpdateInteraction();
 
@@ -256,12 +305,13 @@ namespace TrackingTools
 
 			if( !_drawPointGizmos && !_drawPointIndexLabelGizmos ) return;
 
+			Gizmos.color = _gizmoColor;
 			if( _worldPointTransforms != null && _worldPointTransforms.Length > 0 ){
 				for( int i = 0; i < _worldPointTransforms.Length; i++ ) {
 					var t = _worldPointTransforms[ i ];
 					if( t ){
 						Vector3 p = t.position;
-						if( _drawPointGizmos ) Gizmos.DrawWireSphere( p, _pointGizmoRadius );
+						if( _drawPointGizmos ) Gizmos.DrawWireSphere( p, _gizmoPointRadius );
 						#if UNITY_EDITOR
 							if( _drawPointIndexLabelGizmos ) UnityEditor.Handles.Label( p + _pointLabelOffset, i.ToString() );
 						#endif
@@ -272,14 +322,16 @@ namespace TrackingTools
 
 
 
-void UpdateInteraction()
+		void UpdateInteraction()
 		{
 			if( Keyboard.current[ _resetHotKey ].wasPressedThisFrame ){
 				ResetImageCalibrationPoints();
 			}
 
+			// Only update when interactin with the target display.
+			if( Mouse.current.displayIndex.value != _controlDisplayIndex ) return;
+
 			// Get anchored mouse position within image rect.
-			// Get anchored mouse position withint image rect.
 			Vector2 mousePos = Mouse.current.position.value;
 			var canvasRectTransform = _canvas.GetComponent<RectTransform>();
 			RectTransformUtility.ScreenPointToLocalPointInRectangle( canvasRectTransform, mousePos, _canvas.worldCamera, out mousePos );
@@ -307,7 +359,7 @@ void UpdateInteraction()
 				int pointCount = _worldPointTransforms.Length;
 				for( int p = 0; p < pointCount; p++ ){
 					Vector2 towardsPoint = _userPointRects[ p ].anchorMin - mouseAnchoredPos;
-					float aspect = _projectorCamera.pixelWidth / (float) _projectorCamera.pixelHeight;
+					float aspect = _calibrationCamera.pixelWidth / (float) _calibrationCamera.pixelHeight;
 					towardsPoint.x *= aspect;
 					float sqrDist = Vector2.Dot( towardsPoint, towardsPoint );
 					if( sqrDist < sqrDistMin ) {
@@ -336,64 +388,6 @@ void UpdateInteraction()
 			}
 		}
 
-		/*
-		void UpdateInteraction()
-		{
-			if( Keyboard.current[ _resetHotKey].wasPressedThisFrame ){
-				ResetImageCalibrationPoints();
-			}
-			
-			bool changed = false;
-
-			// Get anchored mouse position withint image rect.
-			Vector2 mousePos = Mouse.current.position.value;
-			var canvasRectTransform = _canvas.GetComponent<RectTransform>();
-			RectTransformUtility.ScreenPointToLocalPointInRectangle( canvasRectTransform, mousePos, _canvas.worldCamera, out mousePos );
-			mousePos = LocalPixelPositionToAnchoredPosition( mousePos, canvasRectTransform );
-			
-			// Deselect.
-			if( Mouse.current.leftButton.wasReleasedThisFrame && _isPointActive && _focusedPointIndex != -1){
-				SetAnchoredPosition( _userPointRects[_focusedPointIndex], mousePos );
-				changed = true;
-				_userPointImages[_focusedPointIndex].color = _pointHoverColor;
-				_isPointActive = false;
-			} else {
-				if( _isPointActive ){
-					// Update position.
-					SetAnchoredPosition( _userPointRects[_focusedPointIndex], mousePos );
-					changed = true;
-				} else {
-					// Find nearest point.
-					float sqrDistMin = float.MaxValue;
-					int nearestPointIndex = -1;
-					int pointCount = _worldPointTransforms.Length;
-					for( int p = 0; p < pointCount; p++ ){
-						Vector2 towardsPoint = _userPointRects[p].anchorMin - mousePos;
-						float sqrDist = Vector2.Dot( towardsPoint, towardsPoint );
-						if( sqrDist < sqrDistMin ) {
-							nearestPointIndex = p;
-							sqrDistMin = sqrDist;
-						}
-					}
-					if( _focusedPointIndex != -1 ){
-						_userPointImages[_focusedPointIndex].color = _pointIdleColor;
-						if( Mouse.current.leftButton.wasPressedThisFrame ) {
-							// Select.
-							_userPointImages[nearestPointIndex].color = _pointActiveColor;
-							_isPointActive = true;
-						} else {
-							// Hover.
-							_userPointImages[nearestPointIndex].color = _pointHoverColor;
-						}
-					}
-					_focusedPointIndex = nearestPointIndex;
-				}
-			}
-		
-			if( changed ) _dirtyPoints = true;
-		}
-		*/
-	
 	
 	
 		void UpdateCalibration()
@@ -403,15 +397,9 @@ void UpdateInteraction()
 			{
 				Vector2 posImage = _userPointRects[ p ].anchorMin; // Min and max should be the same.
 				posImage.y = 1f - posImage.y; // OpenCv pixels are flipped vertically.
-				//posImage.x = 1f - posImage.x;
 				posImage.Scale( _operation.resolution );
 				_imagePoints[ p ] = posImage;
 				_worldPoints[ p ] = _worldPointTransforms[ p ].position;
-				//Vector3 posWorld = _worldPointTransforms[ p ].position;
-				//_calibrationPointsWorldMat.put( p, 0, new double[]{ posWorld.x, posWorld.y, posWorld.z } );
-				//_calibrationPointsImageMat.put( p, 0, new double[]{ posImage.x, posImage.y } );
-				//Debug.Log( $"World Point {p}: {posWorld}" );
-				//Debug.Log( $"Image Point {p}: {posImage}" );
 			}
 
 			_operation.ClearSamples();
@@ -419,27 +407,15 @@ void UpdateInteraction()
 			_operation.Update( samplesHaveDistortion: false, useAspect: true, _intrinsicGuess );
 			
 			// Apply.
-			_operation.intrinsicsResult.ApplyToUnityCamera( _projectorCamera );
-			_operation.extrinsicsResults[0].ApplyToTransform( _projectorCamera.transform );
+			_operation.intrinsicsResult.ApplyToUnityCamera( _calibrationCamera );
+			_operation.extrinsicsResults[0].ApplyToTransform( _calibrationCamera.transform );
 
-			// Not sure why we need to rotate everything here. The translation is correct.
-			_projectorCamera.transform.Rotate( new Vector3( 0, 180, 0 ), Space.Self );
-
-			Debug.Log( $"RMS Error: {_operation.rmsErrorResult}\n");
+			if( _rmsErrorText ) _rmsErrorText.text = _operation.rmsErrorResult.ToString( "F2" );
 
 			// Done.
 			_dirtyCalibration = false;
 		}
 
-
-		//void TryLoadPhysicalCameraIntrinsics()
-		//{
-		//	if( !Intrinsics.TryLoadFromFile( _projectorIntrinsicsFileName, out _intrinsics ) ) {
-		//		enabled = false;
-		//		Debug.LogError( logPrepend + "Missing instrinsics file: '" + _projectorIntrinsicsFileName + "'\n" );
-		//		return;
-		//	}
-		//}
 
 		void TryLoadCalibrationPoints()
 		{
@@ -473,6 +449,16 @@ void UpdateInteraction()
 
 			//Debug.Log( logPrepend + "Saved anchor points to file.\n" + filePath );
 		}
+
+
+		void RecreateCalibrationTexture()
+		{
+			if( _calibrationTexture ) _calibrationTexture.Release();
+			_calibrationTexture = new RenderTexture( _resolution.x, _resolution.y, 32, GraphicsFormat.R8G8B8A8_UNorm );
+			_calibrationTexture.name = "CalibrationTexture";
+			if( _calibrationImage ) _calibrationImage.texture = _calibrationTexture;
+			if( _calibrationCamera ) _calibrationCamera.targetTexture = _calibrationTexture;
+		} 
 
 
 		static void ExpandRectTransform( RectTransform rectTransform )
