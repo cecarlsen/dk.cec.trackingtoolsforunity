@@ -24,6 +24,7 @@ namespace TrackingTools
 		[SerializeField] bool _interactable = false;
 		
 		[Header("Input")]
+		[SerializeField,Tooltip("Used when resetting points.")] Transform _extrinsicGuessTransform = null;
 		[SerializeField] Transform[] _worldPointTransforms = null;
 		[SerializeField] Texture _physicalCameraTexture = null;
 		[SerializeField] bool _preFlipPhysicalCameraTextureY = true;
@@ -153,6 +154,11 @@ namespace TrackingTools
 			}
 		}
 
+		public Transform extrinsicGuessTransform{
+			get { return _extrinsicGuessTransform; }
+			set { _extrinsicGuessTransform = value; }
+		}
+
 		public Camera virtualCamera => _virtualCamera;
 
 
@@ -188,6 +194,8 @@ namespace TrackingTools
 		/// </summary>
 		public void ResetImageCalibrationPoints()
 		{
+			if( _extrinsicGuessTransform ) _virtualCamera.transform.SetPositionAndRotation( _extrinsicGuessTransform.position, _extrinsicGuessTransform.rotation );
+
 			int pointCount = _worldPointTransforms.Length;
 			for( int p = 0; p < pointCount; p++ ) {
 				Vector2 viewportPoint = _virtualCamera.WorldToViewportPoint( _worldPointTransforms[ p ].position );
