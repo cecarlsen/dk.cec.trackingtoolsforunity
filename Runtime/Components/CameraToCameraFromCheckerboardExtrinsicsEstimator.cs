@@ -11,6 +11,7 @@ using OpenCVForUnity.UnityUtils;
 using OpenCVForUnity.CoreModule;
 using OpenCVForUnity.Calib3dModule;
 using OpenCVForUnity.ImgprocModule;
+using OpenCVForUnity.UnityIntegration;
 
 
 namespace TrackingTools
@@ -308,7 +309,7 @@ namespace TrackingTools
 			}
 
 			// UI.
-			Utils.fastMatToTexture2D( camTexGrayUndistortMat, processedCameraTexture ); // Will flip back to Unity orientation by default.
+			OpenCVMatUtils.MatToTexture2D( camTexGrayUndistortMat, processedCameraTexture ); // Will flip back to Unity orientation by default.
 		}
 
 

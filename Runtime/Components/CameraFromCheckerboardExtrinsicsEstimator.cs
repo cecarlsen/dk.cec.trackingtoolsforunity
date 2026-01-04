@@ -11,6 +11,7 @@ using OpenCVForUnity.CoreModule;
 using OpenCVForUnity.Calib3dModule;
 using OpenCVForUnity.ImgprocModule;
 using System;
+using OpenCVForUnity.UnityIntegration;
 
 
 namespace TrackingTools
@@ -203,7 +204,7 @@ namespace TrackingTools
 			}
 
 			// UI.
-			Utils.fastMatToTexture2D( _camTexGrayUndistortMat, _processedCameraTexture ); // Will flip back to Unity orientation by default.
+			OpenCVMatUtils.MatToTexture2D( _camTexGrayUndistortMat, _processedCameraTexture ); // Will flip back to Unity orientation by default.
 			if( _precisionDotsContainerObject.activeSelf != _testPrecisionDotsEnabled ) _precisionDotsContainerObject.SetActive( _testPrecisionDotsEnabled );
 
 

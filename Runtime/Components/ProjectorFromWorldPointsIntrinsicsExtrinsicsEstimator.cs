@@ -1,5 +1,5 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2025
+	Copyright © Carl Emil Carlsen 2025-2026
 	http://cec.dk
 
 	Projector calibration using OpenCV calibrateCamera() function. Given a known geometry we feed two sets of points to the function,
@@ -51,9 +51,11 @@ namespace TrackingTools
 		[Header("Gizmos")]
 		[SerializeField] bool _drawGizmosAlways = true;
 		[SerializeField] bool _drawPointIndexLabelGizmos = true;
-		[SerializeField] Vector3 _pointLabelOffset = Vector3.zero;
+		[SerializeField] Vector3 _gizmoLabelOffset = Vector3.zero;
+		[SerializeField] int _gizmosLabelSize = 12;
+		[SerializeField] Color _gizmosLabelColor = Color.white;
 		[SerializeField] bool _drawPointGizmos = true;
-		[SerializeField] Color _gizmoColor = Color.white;
+		[SerializeField] Color _gizmoPointColor = Color.white;
 		[SerializeField] float _gizmoPointRadius = 0.005f;
 
 		CalibrateCameraOperation _operation;
@@ -75,6 +77,7 @@ namespace TrackingTools
 		Vector2 _mouseHitAnchoredPosition;
 		Vector3[] _worldPoints;
 		Vector2[] _imagePoints;
+		GUIStyle _gizmoLabelStyle;
 
 		Color _cameraInitialBackgroundColor;
 		bool _cameraInitialActiveState;
@@ -160,6 +163,12 @@ namespace TrackingTools
 		}
 
 
+		void Awake()
+		{
+			_gizmoLabelStyle = new GUIStyle();
+		}
+
+
 		void OnEnable()
 		{
 			if( _worldPointTransforms == null || _worldPointTransforms.Length < 3 ){
@@ -191,7 +200,7 @@ namespace TrackingTools
 			ExpandRectTransform( _canvasContainerRect );
 			
 			_aspectFitter = _canvasContainerRect.gameObject.AddComponent<AspectRatioFitter>();
-			_aspectFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+ 			_aspectFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
 			_aspectFitter.aspectRatio = _resolution.x / (float) _resolution.y;
 			
 			_calibrationImage = new GameObject("CalibrationTexture").AddComponent<RawImage>();
@@ -239,7 +248,7 @@ namespace TrackingTools
 
 		void OnDisable()
 		{
-			if( !_userPointRects[0] ) return;
+			if( _userPointRects == null ) return;
 
 			// Save.
 			if( _operation.hasResult ){
@@ -249,7 +258,10 @@ namespace TrackingTools
 			SaveAnchorPoints();
 
 			// CLean up after the party.
-			foreach( var pointRect in _userPointRects ) if( pointRect?.gameObject ) Destroy( pointRect.gameObject );
+			foreach( var pointRect in _userPointRects ) if( pointRect != null && pointRect.gameObject != null ) Destroy( pointRect.gameObject );
+			_userPointRects = null;
+			Destroy( _calibrationImage.gameObject );
+			
 			_operation?.Release();
 			Destroy( _aspectFitter );
 			_calibrationTexture?.Release();
@@ -268,7 +280,7 @@ namespace TrackingTools
 
 		void Update()
 		{
-			if( !_calibrationCamera ) return;
+			if( !_calibrationCamera || _userPointRects == null ) return;
 
 			var resolution = new Vector2Int( _calibrationCamera.pixelWidth, _calibrationCamera.pixelHeight );
 			if( _operation == null ){
@@ -305,7 +317,9 @@ namespace TrackingTools
 
 			if( !_drawPointGizmos && !_drawPointIndexLabelGizmos ) return;
 
-			Gizmos.color = _gizmoColor;
+			Gizmos.color = _gizmoPointColor;
+			_gizmoLabelStyle.normal.textColor = _gizmosLabelColor;
+			_gizmoLabelStyle.fontSize = _gizmosLabelSize;
 			if( _worldPointTransforms != null && _worldPointTransforms.Length > 0 ){
 				for( int i = 0; i < _worldPointTransforms.Length; i++ ) {
 					var t = _worldPointTransforms[ i ];
@@ -313,7 +327,9 @@ namespace TrackingTools
 						Vector3 p = t.position;
 						if( _drawPointGizmos ) Gizmos.DrawWireSphere( p, _gizmoPointRadius );
 						#if UNITY_EDITOR
-							if( _drawPointIndexLabelGizmos ) UnityEditor.Handles.Label( p + _pointLabelOffset, i.ToString() );
+							if( _drawPointIndexLabelGizmos ){
+								UnityEditor.Handles.Label( p + _gizmoLabelOffset, i.ToString(), _gizmoLabelStyle );
+							}
 						#endif
 					}
 				}
