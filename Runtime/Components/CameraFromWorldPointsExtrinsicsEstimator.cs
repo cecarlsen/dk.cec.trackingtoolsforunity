@@ -43,7 +43,7 @@ namespace TrackingTools
 		[SerializeField] Font _font = null;
 		[SerializeField] int _fontSize = 12;
 		[SerializeField,Range(0f,1f)] float _virtualAlpha = 0.8f;
-		[SerializeField,Range(1f,25f)] float _physicalBrightness = 1f;
+		[SerializeField,Range(1f,100f)] float _physicalBrightness = 1f;
 		//[SerializeField,Tooltip("Optional")] RectTransform _containerUI;
 		[SerializeField] Color _pointIdleColor = Color.cyan;
 		[SerializeField] Color _pointFocusedColor = Color.magenta;
