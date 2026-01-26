@@ -177,7 +177,7 @@ namespace TrackingTools
 				return;
 			}
 
-			_canvas = _canvasContainerRect.GetComponentInParent<Canvas>();
+			_canvas = _canvasContainerRect.GetComponentInParent<Canvas>( includeInactive : true );
 			_controlDisplayIndex = _canvas.targetDisplay;
 
 			int pointCount = _worldPointTransforms.Length;

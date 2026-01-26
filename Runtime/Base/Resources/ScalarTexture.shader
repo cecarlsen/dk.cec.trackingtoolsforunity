@@ -3,7 +3,8 @@
 	Properties
 	{
 		_MainTex ("Texture", 2D) = "white" {}
-		_Brightness ("Brightness", Float) = 1.0
+		_Factor ("Factor", Float) = 1.0
+		_Pow ("Pow", Float) = 1.0
 		_BurnoutColor ("Burnout Color", Color) = ( 1.0, 1.0, 1.0, 1.0 )
 		[Toggle(FLIP_VERTICALLY)] _FlipVertically("Flip Vertically", Int) = 0
 	}
@@ -37,7 +38,8 @@
 
 			sampler2D _MainTex;
 			float4 _MainTex_ST;
-			half _Brightness;
+			half _Factor;
+			half _Pow;
 			half4 _BurnoutColor;
 			int _FlipVertically;
 
@@ -56,7 +58,7 @@
 			{
 				float4 col = i.color;
 				float monocrhome = tex2D( _MainTex, i.uv ).r;
-				col.rgb *= monocrhome >= 1.0 ? _BurnoutColor.rgb : monocrhome.xxx * _Brightness;
+				col.rgb *= monocrhome >= 1.0 ? _BurnoutColor.rgb : ( _Factor * pow( monocrhome, _Pow ) ).xxx;
 				return col;
 			}
 			ENDCG

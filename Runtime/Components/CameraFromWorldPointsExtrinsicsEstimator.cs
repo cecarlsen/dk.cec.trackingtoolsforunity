@@ -43,7 +43,8 @@ namespace TrackingTools
 		[SerializeField] Font _font = null;
 		[SerializeField] int _fontSize = 12;
 		[SerializeField,Range(0f,1f)] float _virtualAlpha = 0.8f;
-		[SerializeField,Range(1f,100f)] float _physicalBrightness = 1f;
+		[SerializeField,Range(1f,100f)] float _physicalBrightnessFactor = 1f;
+		[SerializeField] float _physicalBrightnessPow = 0.5f;
 		//[SerializeField,Tooltip("Optional")] RectTransform _containerUI;
 		[SerializeField] Color _pointIdleColor = Color.cyan;
 		[SerializeField] Color _pointFocusedColor = Color.magenta;
@@ -130,11 +131,19 @@ namespace TrackingTools
 			set { _virtualAlpha = Mathf.Clamp01( value ); }
 		}
 
-		public float brightness {
-			get { return _physicalBrightness; }
+		public float brightnessFactor {
+			get { return _physicalBrightnessFactor; }
 			set {
-				_physicalBrightness = value;
-				if( _uiMaterial ) _uiMaterial.SetFloat( ShaderIDs._Brightness, _physicalBrightness );
+				_physicalBrightnessFactor = value;
+				if( _uiMaterial ) _uiMaterial.SetFloat( ShaderIDs._Factor, _physicalBrightnessFactor );
+			}
+		}
+
+		public float brightnessPow {
+			get { return _physicalBrightnessPow; }
+			set {
+				_physicalBrightnessPow = value;
+				if( _uiMaterial ) _uiMaterial.SetFloat( ShaderIDs._Pow, _physicalBrightnessPow );
 			}
 		}
 
@@ -164,7 +173,8 @@ namespace TrackingTools
 
 		static class ShaderIDs
 		{
-			public static readonly int _Brightness = Shader.PropertyToID( nameof( _Brightness ) );
+			public static readonly int _Factor = Shader.PropertyToID( nameof( _Factor ) );
+			public static readonly int _Pow = Shader.PropertyToID( nameof( _Pow ) );
 		}
 
 
@@ -390,7 +400,8 @@ namespace TrackingTools
 			interactable = _interactable;
 			physicalCameraTexture = _physicalCameraTexture;
 			alpha = _virtualAlpha;
-			brightness = _physicalBrightness;
+			brightnessFactor = _physicalBrightnessFactor;
+			brightnessPow = _physicalBrightnessPow;
 
 			_fontSize = Mathf.Max( 0, _fontSize );
 		}
