@@ -1,5 +1,5 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2018-2025
+	Copyright © Carl Emil Carlsen 2018-2026
 	http://cec.dk
 
 	Given the intrisics of a camera and a set of points in model space and in camera image space we can use Calib3d.solvePnP
@@ -26,6 +26,7 @@ namespace TrackingTools
 		[Header("Input")]
 		[SerializeField,Tooltip("Used when resetting points.")] Transform _extrinsicGuessTransform = null;
 		[SerializeField] Transform[] _worldPointTransforms = null;
+		[SerializeField,Tooltip("Use when the physical scale differs from virtual scale (i.e. if you are using a physical 1:10 miniature, then set physicalScale to 0.1.")] float _physicalScale = 1f;
 		[SerializeField] Texture _physicalCameraTexture = null;
 		[SerializeField] bool _preFlipPhysicalCameraTextureY = true;
 		[SerializeField] bool _undistortPhysicalCameraTexture = true;
@@ -72,7 +73,10 @@ namespace TrackingTools
 		bool _dirtyTexture = true;
 		bool _needsResetImageCalibrationPoints = false;
 		bool _dirtyCalibration = true;
-		
+
+		Vector3[] _pointsWorld;
+		Vector2[] _pointsImage;
+
 		// UI.
 		RenderTexture _virtualCameraRenderTexture;
 		Material _uiMaterial;
@@ -86,12 +90,6 @@ namespace TrackingTools
 		int _focusedPointIndex = -1;
 		bool _isPointActive;
 		Vector2 _mouseHitAnchoredPosition;
-
-		// OpenCV.
-		Point[] _calibrationPointsImage;
-		Point3[] _calibrationPointsWorld;
-		MatOfPoint2f _calibrationPointsImageMat;
-		MatOfPoint3f _calibrationPointsWorldMat;
 
 		// THESE ARE FOR THE ALTERNATIVE CPU-BASED OPENCV UNDISTORTION.
 		//Texture2D _tempTransferTexture; // For conversion from RenderTexture input.
@@ -124,6 +122,11 @@ namespace TrackingTools
 				_interactable = value;
 				if( _physicalCameraImageUI && Application.isPlaying ) _physicalCameraImageUI.gameObject.SetActive( _interactable );
 			}
+		}
+
+		public float physicalScale {
+			get { return _physicalScale; }
+			set{ _physicalScale = value > 0 ? value : 0f; }
 		}
 
 		public float alpha {
@@ -519,21 +522,16 @@ namespace TrackingTools
 			// Update points.
 			for( int p = 0; p < _worldPointTransforms.Length; p++ )
 			{
+				_pointsWorld[ p ] = _worldPointTransforms[ p ].position;
 				Vector2 posImage = _userPointRects[ p ].anchorMin; // Min and max should be the same.
 				posImage.y = 1f - posImage.y; // OpenCv pixels are flipped vertically so (0,0) is at the top left corner.
 				posImage.Scale( new Vector2( _intrinsics.width, _intrinsics.height ) );
-				_calibrationPointsImage[ p ].set( new double[]{ posImage.x, posImage.y } );
-				Vector3 posWorld = _worldPointTransforms[ p ].position;
-				_calibrationPointsWorld[ p ].set( new double[]{ posWorld.x, posWorld.y, posWorld.z } );
-				//Debug.Log( posWorld + " -> " + _calibrationPointsWorld[ p ] );
+				_pointsImage[ p ] = posImage;
 			}
-			_calibrationPointsImageMat.fromArray( _calibrationPointsImage );
-			_calibrationPointsWorldMat.fromArray( _calibrationPointsWorld );
 
-			//Debug.Log( _calibrationPointsWorldMat.dump() );
-
-			_extrinsicsCalibrator.UpdateExtrinsics( _calibrationPointsWorldMat, _calibrationPointsImageMat, _intrinsics );
+			_extrinsicsCalibrator.UpdateExtrinsics( _pointsWorld, _pointsImage, _intrinsics, _physicalScale );
 			
+
 			_extrinsicsCalibrator.extrinsics.ApplyToTransform( _virtualCamera.transform );
 
 			// Save.
@@ -609,6 +607,9 @@ namespace TrackingTools
 			int pointCount = _worldPointTransforms?.Length ?? 0;
 			if( pointCount < worldPointTransformCountMin ) return;
 
+			_pointsWorld = new Vector3[ pointCount ];
+			_pointsImage = new Vector2[ pointCount ];
+
 			// UI.
 			_userPointRects = new RectTransform[pointCount];
 			_userPointImages = new Image[pointCount];
@@ -631,18 +632,6 @@ namespace TrackingTools
 				_userPointRects[p] = pointRect;
 				_userPointImages[p] = pointImage;
 			}
-
-			// OpenCV.
-			_calibrationPointsImage = new Point[pointCount];
-			_calibrationPointsWorld = new Point3[pointCount];
-			_calibrationPointsImageMat = new MatOfPoint2f();
-			_calibrationPointsWorldMat = new MatOfPoint3f();
-			_calibrationPointsImageMat.alloc( pointCount );
-			_calibrationPointsWorldMat.alloc( pointCount );
-			for( int p = 0; p < pointCount; p++ ) {
-				_calibrationPointsImage[p] = new Point();
-				_calibrationPointsWorld[p] = new Point3();
-			}
 		}
 
 
@@ -651,12 +640,6 @@ namespace TrackingTools
 			// UI.
 			if( _userPointRects != null ) foreach( var pointRect in _userPointRects ) if( pointRect && pointRect.gameObject ) Destroy( pointRect.gameObject );
 			_userPointRects = null;
-
-			// OpenCV.
-			_calibrationPointsImageMat?.release();
-			_calibrationPointsWorldMat?.Dispose();
-			_calibrationPointsImageMat = null;
-			_calibrationPointsWorldMat = null;
 		}
 
 
@@ -668,14 +651,16 @@ namespace TrackingTools
 			int h = _physicalCameraTexture.height;
 			if( _undistortPhysicalCameraTexture && ( _processedPhysicalCameraTexture == null || _processedPhysicalCameraTexture.width != w || _processedPhysicalCameraTexture.height != h ) ){
 				_processedPhysicalCameraTexture?.Release();
-				_processedPhysicalCameraTexture = new RenderTexture( w, h, 0, _physicalCameraTexture.graphicsFormat );
-				_processedPhysicalCameraTexture.name = "PhysicalCameraTexture";
+				_processedPhysicalCameraTexture = new RenderTexture( w, h, 0, _physicalCameraTexture.graphicsFormat ){
+					name = "PhysicalCameraTexture"
+				};
 			}
 
 			if( !_virtualCameraRenderTexture || _virtualCameraRenderTexture.width != w || _virtualCameraRenderTexture.height != h ){
 				if( _virtualCameraRenderTexture ) _virtualCameraRenderTexture.Release();
-				_virtualCameraRenderTexture = new RenderTexture( w, h, 16 );
-				_virtualCameraRenderTexture.name = "VirtualCameraTexture";
+				_virtualCameraRenderTexture = new RenderTexture( w, h, 16 ){
+					name = "VirtualCameraTexture"
+				};
 				_virtualCamera.targetTexture = _virtualCameraRenderTexture;
 				_virtualCameraImageUI.texture = _virtualCameraRenderTexture;
 

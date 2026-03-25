@@ -5,6 +5,7 @@
 
 using OpenCVForUnity.CoreModule;
 using OpenCVForUnity.Calib3dModule;
+using UnityEngine;
 
 namespace TrackingTools
 {
@@ -14,6 +15,11 @@ namespace TrackingTools
 
 		Mat _sensorMatrix;
 		MatOfDouble _noDistCoeffs;
+
+		Point3[] _worldPoints;
+		Point[] _imagePoints;
+		MatOfPoint3f _worldPointsMat;
+		MatOfPoint2f _imagePointsMat;
 
 		Mat _rotationVecMat;
 		Mat _translationVecMat;
@@ -33,9 +39,8 @@ namespace TrackingTools
 		}
 
 
-		public bool UpdateExtrinsics( MatOfPoint3f patternPointsWorldMat, MatOfPoint2f patternPointsImageMat, Intrinsics intrinsics )
+		public bool UpdateExtrinsics( MatOfPoint3f pointsWorldMat, MatOfPoint2f pointsImageMat, Intrinsics intrinsics )
 		{
-
 			// OpenCV's solvePnP will find a result in OpenCV camera space, where Y is flipped. So to compute the result for Unity we flip the sensor matrix vertically.
 			intrinsics.ApplyToOpenCV( ref _sensorMatrix );
 			_sensorMatrix.WriteValue( - _sensorMatrix.ReadValue( 1, 1 ), 1, 1 ); // fy
@@ -49,14 +54,72 @@ namespace TrackingTools
 
 			// Find pattern pose, relative to camera (at zero position) using solvePnP.
 			_isValid = Calib3d.solvePnP(
-				patternPointsWorldMat, patternPointsImageMat, _sensorMatrix, _noDistCoeffs,
+				pointsWorldMat, pointsImageMat, _sensorMatrix, _noDistCoeffs,
 				_rotationVecMat, _translationVecMat // Out.
 			);
 
 			if( _isValid ) {
 				_extrinsics.UpdateFromOpenCv( _rotationVecMat, _translationVecMat );
 			} else {
-				UnityEngine.Debug.LogWarning( "Calib3d.solvePnP failed\n" );
+				Debug.LogWarning( "Calib3d.solvePnP failed\n" );
+			}
+
+			return _isValid;
+		}
+
+
+		public bool UpdateExtrinsics( Vector3[] pointsWorld, Vector2[] pointsImage, Intrinsics intrinsics, float physicalScale = 1f )
+		{
+			// Check.
+			int pointCount = pointsWorld.Length;
+			if( pointCount != pointsImage.Length ){
+				Debug.Log( "Abort. Array lengths must match!\n");
+				return false;
+			}
+
+			// Ensure CV resources.
+			if( _imagePoints == null || _imagePoints.Length != pointCount )
+			{
+				_worldPointsMat?.release();
+				_imagePointsMat?.release();
+				_worldPoints = new Point3[pointCount];
+				_imagePoints = new Point[pointCount];
+				_worldPointsMat = new MatOfPoint3f();
+				_imagePointsMat = new MatOfPoint2f();
+				_worldPointsMat.alloc( pointCount );
+				_imagePointsMat.alloc( pointCount );
+				for( int p = 0; p < pointCount; p++ ) {
+					_worldPoints[p] = new Point3();
+					_imagePoints[p] = new Point();
+				}
+			}
+
+			// Copy and scale.
+			for( int p = 0; p < pointCount; p++ )
+			{
+				Vector3 posWorld = pointsWorld[ p ] * physicalScale;
+				_worldPoints[ p ].set( new double[]{ posWorld.x, posWorld.y, posWorld.z } );
+				Vector2 posImage = pointsImage[ p ];
+				_imagePoints[ p ].set( new double[]{ posImage.x, posImage.y } );
+			}
+			_worldPointsMat.fromArray( _worldPoints );
+			_imagePointsMat.fromArray( _imagePoints );
+
+			// Update intrinsics. OpenCV's solvePnP will find a result in OpenCV camera space, where Y is flipped. So to compute the result for Unity we flip the sensor matrix vertically.
+			intrinsics.ApplyToOpenCV( ref _sensorMatrix );
+			_sensorMatrix.WriteValue( - _sensorMatrix.ReadValue( 1, 1 ), 1, 1 ); // fy
+
+			// Find pattern pose, relative to camera (at zero position) using solvePnP.
+			_isValid = Calib3d.solvePnP(
+				_worldPointsMat, _imagePointsMat, _sensorMatrix, _noDistCoeffs,
+				_rotationVecMat, _translationVecMat // Out.
+			);
+
+			if( _isValid ) {
+				// Update extrinsics and apply optional scale.
+				_extrinsics.UpdateFromOpenCv( _rotationVecMat, _translationVecMat, physicalScale );
+			} else {
+				Debug.LogWarning( "Calib3d.solvePnP failed\n" );
 			}
 
 			return _isValid;
@@ -68,6 +131,8 @@ namespace TrackingTools
 			_noDistCoeffs.release();
 			_rotationVecMat.release();
 			_translationVecMat.release();
+			_worldPointsMat?.release();
+			_imagePointsMat?.release();
 		}
 	}
 }

@@ -88,11 +88,11 @@ namespace TrackingTools
 		/// Beware that calibration can fail if pattern is not rotated to face forward, so that z is zero.
 		/// Also ensure that the point order in the the two point sets are matching.
 		/// </summary>
-		/// <param name="patternRealModelSample">Must be measured in millimeters</param>
+		/// <param name="patternWorldSample">Must be measured in millimeters</param>
 		/// <param name="patternImageSample"></param>
-		public void AddSample( IList<Vector3> patternRealModelSample, IList<Vector2> patternImageSample )
+		public void AddSample( IList<Vector3> patternWorldSample, IList<Vector2> patternImageSample, float physicalScale = 1f )
 		{
-			int count = patternRealModelSample.Count;
+			int count = patternWorldSample.Count;
 			if( _pointsWorldMat == null || _pointsWorldMat.rows() != count ){
 				if( _pointsWorldMat != null ) _pointsWorldMat.release();
 				if( _pointsImageMat != null ) _pointsImageMat.release();
@@ -104,7 +104,7 @@ namespace TrackingTools
 
 			for( int p = 0; p < count; p++ )
 			{
-				var worldPoint = patternRealModelSample[p];
+				var worldPoint = patternWorldSample[p] * physicalScale;
 				var imagePoint = patternImageSample[p];
 				for( int i = 0; i < _vec3Array.Length; i++ )_vec3Array[i] = worldPoint[i];
 				for( int i = 0; i < _vec2Array.Length; i++ )_vec2Array[i] = imagePoint[i];
@@ -134,7 +134,7 @@ namespace TrackingTools
 		}
 
 
-		public bool Update( bool samplesHaveDistortion = true, bool useAspect = false, Intrinsics intrinsicGuess = null )
+		public bool Update( bool samplesHaveDistortion = true, bool useAspect = false, Intrinsics intrinsicGuess = null, float physicalScale = 1f )
 		{
 			if( _patternWorldSamples.Count == 0 ||  _patternImageSamples.Count == 0 ) return false;
 
@@ -188,7 +188,7 @@ namespace TrackingTools
 			_extrinsicsResults.Clear();
 			for( int i = 0; i < _patternWorldSamples.Count; i++ ){
 				var extrinsics = new Extrinsics();
-				extrinsics.UpdateFromOpenCv( _rotationResults[i], _translationResults[i] );
+				extrinsics.UpdateFromOpenCv( _rotationResults[i], _translationResults[i], physicalScale ); // Scale output (support physical miniture model)
 				extrinsics.FlipYRotation180(); // Not sure why we need to do this. But then it fits =/
 				_extrinsicsResults.Add( extrinsics );
 			}

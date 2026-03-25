@@ -1,5 +1,5 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2020-2024
+	Copyright © Carl Emil Carlsen 2020-2026
 	http://cec.dk
 */
 
@@ -9,11 +9,12 @@ namespace TrackingTools
 {
 	public class ExtrinsicsLoader : MonoBehaviour
 	{
-		[SerializeField] string _extrinsicsFileName = "DefaultCamera";
-		[SerializeField,Tooltip("Optional")] Transform _anchorTransform = null;
+		[SerializeField] string _extrinsicsFileName = "Default";
+		[SerializeField,Tooltip( "Optionally make extrinsics relative to anchor." )] Transform _anchorTransform = null;
 		[SerializeField] AutoLoadTime _autoLoadTime = AutoLoadTime.Awake;
 		[SerializeField] bool _inverse = false;
-		[SerializeField] bool _isMirrored = false;
+		[SerializeField,Tooltip("When enabled, anchorTransform.localScale.Max() will be applied to extrinsics translation")] bool _applyUniformAnchorScale = false;
+		[SerializeField] bool _isMirroredRelativeToAnchor = false;
 		[SerializeField] Vector3 _postRotationLocal = Vector3.zero;
 		[SerializeField] Vector3 _postRotationGlobal = Vector3.zero;
 		[SerializeField] Vector3 _postOffsetLocal = Vector3.zero;
@@ -78,7 +79,7 @@ namespace TrackingTools
 		{
 			if( _extrinsics == null ) return;
 
-			_extrinsics.ApplyToTransform( transform, _anchorTransform, _inverse, _isMirrored );
+			_extrinsics.ApplyToTransform( transform, _anchorTransform, _inverse, _isMirroredRelativeToAnchor, _applyUniformAnchorScale );
 
 			if( _anchorTransform && _embedInAnchorTransform ) transform.SetParent( _anchorTransform );
 

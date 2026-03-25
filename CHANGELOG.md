@@ -1,6 +1,11 @@
 # Changelog
 
 
+## [0.1.12] 2026-03-25
+
+- Adding physical scaling option to ProjectorFromWorldPointsIntrinsicsExtrinsicsEstimator and CameraFromWorldPointsExtrinsicsEstimator to support working with miniature mockup models.
+
+
 ## [0.1.11] 2025-12-05
 
 - Update to the new Input System.

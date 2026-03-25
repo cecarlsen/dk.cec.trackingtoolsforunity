@@ -28,6 +28,7 @@ namespace TrackingTools
 		[SerializeField,Tooltip("Used for initial point positioning.")] Transform _extrinsicGuess = null;
 		[SerializeField] Vector2Int _resolution = new Vector2Int( 1920, 1080 );
 		[SerializeField] Transform[] _worldPointTransforms = null;
+		[SerializeField,Tooltip("Use when the physical scale differs from virtual scale (i.e. if you are using a physical 1:10 miniature, then set physicalScale to 0.1.")] float _physicalScale = 1f;
 
 		[Header("Output")]
 		[SerializeField,Tooltip("Without extension name (.json)")] string _calibrationPointsFileName = "DefaultProjector";
@@ -91,6 +92,11 @@ namespace TrackingTools
 		public bool interactable {
 			get { return _interactable; }
 			set { _interactable = value; }
+		}
+
+		public float physicalScale {
+			get { return _physicalScale; }
+			set{ _physicalScale = value > 0 ? value : 0f; }
 		}
 
 		public float alpha {
@@ -419,8 +425,8 @@ namespace TrackingTools
 			}
 
 			_operation.ClearSamples();
-			_operation.AddSample( _worldPoints, _imagePoints );
-			_operation.Update( samplesHaveDistortion: false, useAspect: true, _intrinsicGuess );
+			_operation.AddSample( _worldPoints, _imagePoints, _physicalScale );
+			_operation.Update( samplesHaveDistortion: false, useAspect: true, _intrinsicGuess, _physicalScale );
 			
 			// Apply.
 			_operation.intrinsicsResult.ApplyToUnityCamera( _calibrationCamera );

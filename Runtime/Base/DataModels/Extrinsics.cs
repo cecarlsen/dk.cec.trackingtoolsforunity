@@ -1,5 +1,5 @@
 ﻿/*
-	Copyright © Carl Emil Carlsen 2020
+	Copyright © Carl Emil Carlsen 2020-2026
 	http://cec.dk
 
 	Holds the rotation and translation that will transform the calibrated pattern 
@@ -21,10 +21,10 @@ namespace TrackingTools
 		static readonly string logPrepend = "<b>[" + nameof( Extrinsics ) + "]</b> ";
 
 
-		public void ApplyToTransform( Transform transform, Transform achorTransform = null, bool inverse = false, bool isMirrored = false )
+		public void ApplyToTransform( Transform transform, Transform achorTransform = null, bool inverse = false, bool isMirroredRelativeToAnchor = false, bool applyUniformAnchorScale = false )
 		{
-			Quaternion r = rotation;
-			Vector3 t = translation;
+			var r = rotation;
+			var t = translation;
 
 			if( inverse ) {
 				r = Quaternion.Inverse( rotation );
@@ -32,9 +32,11 @@ namespace TrackingTools
 			}
 
 			if( achorTransform ) {
-				if( isMirrored ) r.z *= -1;
+				if( isMirroredRelativeToAnchor ) r.z *= -1;
 				r = achorTransform.rotation * r;
-				t = achorTransform.position + achorTransform.rotation * t;
+				t = achorTransform.rotation * t;
+				if( applyUniformAnchorScale ) t *= achorTransform.localScale.Max();
+				t += achorTransform.position;
 			}
 
 			transform.SetPositionAndRotation( t, r );
@@ -94,12 +96,12 @@ namespace TrackingTools
 		}
 
 
-		public void UpdateFromOpenCv( Mat rotationVectorMat, Mat translationVectorMat )
+		public void UpdateFromOpenCv( Mat rotationVectorMat, Mat translationVectorMat, float physicalScale = 1f )
 		{
 			Vector3 rotationVector = rotationVectorMat.ReadVector3();
 			rotation = Quaternion.AngleAxis( rotationVector.magnitude * Mathf.Rad2Deg, rotationVector );
 
-			translation = translationVectorMat.ReadVector3();
+			translation = translationVectorMat.ReadVector3() / physicalScale;
 
 			// Store the inverse. It seems more intuitive to store the extrinsics of the camera, not the calibration board.
 			rotation = Quaternion.Inverse( rotation );
