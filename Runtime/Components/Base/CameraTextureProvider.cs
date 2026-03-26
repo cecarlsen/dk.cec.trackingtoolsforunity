@@ -1,5 +1,5 @@
 /*
-	Copyright © Carl Emil Carlsen 2024
+	Copyright ï¿½ Carl Emil Carlsen 2024
 	http://cec.dk
 */
 
@@ -9,7 +9,7 @@ namespace TrackingTools
 {
 	public abstract class CameraTextureProvider : MonoBehaviour
 	{
-		[SerializeField,Range(1,300)] protected int _frameHistoryCapacity = 1;
+		[SerializeField,Range(1,1024)] protected int _frameHistoryCapacity = 1;
 
 
 		/// <summary>
