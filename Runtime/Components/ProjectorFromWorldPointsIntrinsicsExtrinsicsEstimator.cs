@@ -15,6 +15,7 @@ using OpenCVForUnity.CoreModule;
 using System;
 using UnityEngine.InputSystem;
 using UnityEngine.Experimental.Rendering;
+using Intel.RealSense;
 
 namespace TrackingTools
 {
@@ -137,10 +138,13 @@ namespace TrackingTools
 
 
 		/// <summary>
-		/// Reset calibration points to fit current camera perspective.
+		/// Reset calibration points to fit extrinsicGuess camera perspective.
 		/// </summary>
 		public void ResetImageCalibrationPoints()
 		{
+			_calibrationCamera.transform.position = _extrinsicGuess.position;
+			_calibrationCamera.transform.rotation = _extrinsicGuess.rotation;
+
 			int pointCount = _worldPointTransforms.Length;
 			for( int p = 0; p < pointCount; p++ ) {
 				Vector2 viewportPoint = _calibrationCamera.WorldToViewportPoint( _worldPointTransforms[ p ].position );
