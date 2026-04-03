@@ -144,6 +144,8 @@ namespace TrackingTools
 		{
 			_calibrationCamera.transform.position = _extrinsicGuess.position;
 			_calibrationCamera.transform.rotation = _extrinsicGuess.rotation;
+			_intrinsicGuess.ApplyToUnityCamera( _calibrationCamera );
+			
 
 			int pointCount = _worldPointTransforms.Length;
 			for( int p = 0; p < pointCount; p++ ) {
@@ -195,8 +197,7 @@ namespace TrackingTools
 			_imagePoints = new Vector2[ pointCount ];
 
 			_intrinsicGuess = new Intrinsics();
-			_intrinsicGuess.UpdateFromProjectorParameters( _throwRatioGuess, _resolution, _lensshiftGuess );
-			_intrinsicGuess.ApplyToUnityCamera( _calibrationCamera );
+			_intrinsicGuess.UpdateFromProjectorParameters( _throwRatioGuess, _resolution, _lensshiftGuess ); // We apply in ResetImageCalibrationPoints().
 
 			_calibrationCamera.transform.position = _extrinsicGuess.position;
 			_calibrationCamera.transform.rotation = _extrinsicGuess.rotation;

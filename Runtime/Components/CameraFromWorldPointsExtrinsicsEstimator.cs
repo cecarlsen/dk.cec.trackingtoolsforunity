@@ -49,7 +49,7 @@ namespace TrackingTools
 		//[SerializeField,Tooltip("Optional")] RectTransform _containerUI;
 		[SerializeField] Color _pointIdleColor = Color.cyan;
 		[SerializeField] Color _pointFocusedColor = Color.magenta;
-		[SerializeField] Color _pointActiveColor = Color.yellow;
+		[SerializeField] Color _pointActiveColor = Color.green; // Was yellow, but was impossible to see when overlaying a bright point.
 
 		[Header("Gizmos")]
 		[SerializeField] bool _drawGizmosAlways = true;
