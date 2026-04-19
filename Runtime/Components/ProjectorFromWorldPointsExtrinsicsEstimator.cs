@@ -34,6 +34,7 @@ namespace TrackingTools
 		[SerializeField] Canvas _canvas = null;
 		[SerializeField] KeyCode _interactableHotKey = KeyCode.Alpha1;
 		[SerializeField] KeyCode _resetHotKey = KeyCode.Backspace;
+		[SerializeField] Sprite _dotSprite = null;
 		[SerializeField] Font _font = null;
 		[SerializeField] int _fontSize = 12;
 		[SerializeField,Range(0f,1f)] float _virtualAlpha = 0.8f;
@@ -161,11 +162,14 @@ namespace TrackingTools
 				GameObject pointObject = new GameObject( "Point" + p );
 				pointObject.transform.SetParent( _containerUI );
 				Image pointImage = pointObject.AddComponent<Image>();
+				pointImage.raycastTarget = false;
+				pointImage.sprite = _dotSprite;
 				pointImage.color = Color.cyan;
 				RectTransform pointRect = pointObject.GetComponent<RectTransform>();
-				pointRect.sizeDelta = Vector2.one * 5;
+				pointRect.sizeDelta = Vector2.one * _dotSprite.rect.height / 2;
 				pointRect.anchoredPosition = Vector3.zero;
 				Text pointLabel = new GameObject( "Label" ).AddComponent<Text>();
+				pointLabel.raycastTarget = false;
 				pointLabel.text = p.ToString();
 				pointLabel.transform.SetParent( pointRect );
 				pointLabel.rectTransform.anchoredPosition = Vector2.zero;

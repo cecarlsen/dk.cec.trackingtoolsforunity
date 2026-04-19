@@ -4,11 +4,11 @@ MonoImporter:
   externalObjects: {}
   serializedVersion: 2
   defaultReferences:
+  - _projectorCamera: {instanceID: 0}
   - _canvas: {instanceID: 0}
-  - _anchor: {instanceID: 0}
-  - _texture: {instanceID: 0}
-  - _targetCameraTransform: {instanceID: 0}
+  - _dotSprite: {fileID: 21300000, guid: 5796caad54aa3eb4984343e9b73df7e4, type: 3}
   - _font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+  - _containerUI: {instanceID: 0}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

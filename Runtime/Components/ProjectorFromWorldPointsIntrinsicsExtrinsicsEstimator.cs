@@ -15,7 +15,6 @@ using OpenCVForUnity.CoreModule;
 using System;
 using UnityEngine.InputSystem;
 using UnityEngine.Experimental.Rendering;
-using Intel.RealSense;
 
 namespace TrackingTools
 {
@@ -43,6 +42,7 @@ namespace TrackingTools
 		[SerializeField] Key _interactableHotKey = Key.Digit1;
 		[SerializeField] Key _resetHotKey = Key.Backspace;
 		[SerializeField] Key _precisionHoldHotKey = Key.LeftCtrl;
+		[SerializeField] Sprite _dotSprite = null;
 		[SerializeField] Font _font = null;
 		[SerializeField] int _fontSize = 12;
 		[SerializeField,Range(0f,1f)] float _virtualAlpha = 0.8f;
@@ -226,15 +226,18 @@ namespace TrackingTools
 				GameObject pointObject = new GameObject( "Point" + p );
 				pointObject.transform.SetParent( _canvasContainerRect );
 				Image pointImage = pointObject.AddComponent<Image>();
-				pointImage.color = Color.cyan;
+				pointImage.raycastTarget = false;
+				pointImage.sprite = _dotSprite;
+				pointImage.color = _pointIdleColor;
 				RectTransform pointRect = pointObject.GetComponent<RectTransform>();
-				pointRect.sizeDelta = Vector2.one * 3;
+				pointRect.sizeDelta = Vector2.one * _dotSprite.rect.height / 2;
 				pointRect.anchoredPosition = Vector3.zero;
 				Text pointLabel = new GameObject( "Label" ).AddComponent<Text>();
+				pointLabel.raycastTarget = false;
 				pointLabel.text = p.ToString();
 				pointLabel.transform.SetParent( pointRect );
 				pointLabel.rectTransform.anchoredPosition = Vector2.zero;
-				pointLabel.rectTransform.sizeDelta = new Vector2( _fontSize, _fontSize ) * 2;
+				pointLabel.rectTransform.sizeDelta = new Vector2( _fontSize, _fontSize ) * 3;
 				pointLabel.font = _font;
 				pointLabel.fontSize = _fontSize;
 				_userPointRects[p] = pointRect;
@@ -328,20 +331,23 @@ namespace TrackingTools
 
 			if( !_drawPointGizmos && !_drawPointIndexLabelGizmos ) return;
 
-			Gizmos.color = _gizmoPointColor;
-			_gizmoLabelStyle.normal.textColor = _gizmosLabelColor;
-			_gizmoLabelStyle.fontSize = _gizmosLabelSize;
-			if( _worldPointTransforms != null && _worldPointTransforms.Length > 0 ){
-				for( int i = 0; i < _worldPointTransforms.Length; i++ ) {
-					var t = _worldPointTransforms[ i ];
-					if( t ){
-						Vector3 p = t.position;
-						if( _drawPointGizmos ) Gizmos.DrawWireSphere( p, _gizmoPointRadius );
-						#if UNITY_EDITOR
-							if( _drawPointIndexLabelGizmos ){
-								UnityEditor.Handles.Label( p + _gizmoLabelOffset, i.ToString(), _gizmoLabelStyle );
-							}
-						#endif
+			if( _gizmoLabelStyle != null )
+			{
+				Gizmos.color = _gizmoPointColor;
+				_gizmoLabelStyle.normal.textColor = _gizmosLabelColor;
+				_gizmoLabelStyle.fontSize = _gizmosLabelSize;
+				if( _worldPointTransforms != null && _worldPointTransforms.Length > 0 ){
+					for( int i = 0; i < _worldPointTransforms.Length; i++ ) {
+						var t = _worldPointTransforms[ i ];
+						if( t ){
+							Vector3 p = t.position;
+							if( _drawPointGizmos ) Gizmos.DrawWireSphere( p, _gizmoPointRadius );
+							#if UNITY_EDITOR
+								if( _drawPointIndexLabelGizmos ){
+									UnityEditor.Handles.Label( p + _gizmoLabelOffset, i.ToString(), _gizmoLabelStyle );
+								}
+							#endif
+						}
 					}
 				}
 			}
@@ -374,15 +380,15 @@ namespace TrackingTools
 
 			if( _isPointActive ){
 				// Check for deselection.
-				if( Mouse.current.leftButton.wasReleasedThisFrame && _focusedPointIndex != -1){
-					_userPointImages[_focusedPointIndex].color = _pointFocusedColor;
+				if( Mouse.current.leftButton.wasReleasedThisFrame && _focusedPointIndex != -1 ){
+					_userPointImages[_focusedPointIndex].color = _pointIdleColor;
 					_isPointActive = false;
 				} 
 			} else {
 				// Handle selection.
 				// Find nearest point.
 				float sqrDistMin = mouseHitDistanceMinNormalized * mouseHitDistanceMinNormalized;
-				int nearestPointIndex = -1;
+				int newFocusedPointIndex = -1;
 				int pointCount = _worldPointTransforms.Length;
 				for( int p = 0; p < pointCount; p++ ){
 					Vector2 towardsPoint = _userPointRects[ p ].anchorMin - mouseAnchoredPos;
@@ -390,28 +396,27 @@ namespace TrackingTools
 					towardsPoint.x *= aspect;
 					float sqrDist = Vector2.Dot( towardsPoint, towardsPoint );
 					if( sqrDist < sqrDistMin ) {
-						nearestPointIndex = p;
+						newFocusedPointIndex = p;
 						sqrDistMin = sqrDist;
 					}
 				}
-				if( nearestPointIndex != -1 ){
-					if( _focusedPointIndex != -1 ){
-						if( Mouse.current.leftButton.wasPressedThisFrame ) {
-							// Make active.
-							_userPointImages[nearestPointIndex].color = _pointActiveColor;
-							_mouseHitAnchoredPosition = mouseAnchoredPos;
-							_isPointActive = true;
-						} else {
-							// Indicate focused.
-							_userPointImages[nearestPointIndex].color = _pointFocusedColor;
-						}
+				if( newFocusedPointIndex != -1 ){
+					if( Mouse.current.leftButton.wasPressedThisFrame ) {
+						// Make active.
+						_userPointImages[newFocusedPointIndex].color = _pointActiveColor;
+						_mouseHitAnchoredPosition = mouseAnchoredPos;
+						_isPointActive = true;
+					} else {
+						// Indicate focused.
+						_userPointImages[newFocusedPointIndex].color = _pointFocusedColor;
 					}
-				} else if( _focusedPointIndex != -1 ){
+				}
+				if( _focusedPointIndex != -1 && _focusedPointIndex != newFocusedPointIndex ){
 					// Defocus.
 					_isPointActive = false;
 					_userPointImages[ _focusedPointIndex ].color = _pointIdleColor;
 				}
-				_focusedPointIndex = nearestPointIndex;
+				_focusedPointIndex = newFocusedPointIndex;
 			}
 		}
 
@@ -481,8 +486,9 @@ namespace TrackingTools
 		void RecreateCalibrationTexture()
 		{
 			if( _calibrationTexture ) _calibrationTexture.Release();
-			_calibrationTexture = new RenderTexture( _resolution.x, _resolution.y, 32, GraphicsFormat.R8G8B8A8_UNorm );
-			_calibrationTexture.name = "CalibrationTexture";
+			_calibrationTexture = new RenderTexture( _resolution.x, _resolution.y, 32, GraphicsFormat.R8G8B8A8_UNorm ){
+				name = "CalibrationTexture",
+			};
 			if( _calibrationImage ) _calibrationImage.texture = _calibrationTexture;
 			if( _calibrationCamera ) _calibrationCamera.targetTexture = _calibrationTexture;
 		} 
@@ -508,7 +514,7 @@ namespace TrackingTools
 		static Vector2 LocalPixelPositionToAnchoredPosition( Vector2 pos, RectTransform rectTransform )
 		{
 			UnityEngine.Rect rect = rectTransform.rect;
-			Vector2 anchoredPosition = new Vector2( ( pos.x - rect.x ) / rect.width, ( pos.y - rect.y ) / rect.height );
+			Vector2 anchoredPosition = new Vector2( ( pos.x - rect.x ) / (float) rect.width, ( pos.y - rect.y ) / (float) rect.height );
 			//Debug.Log( "pos: " + pos + ", rectTransform: " + rectTransform.rect + ", anchoredPosition: " + anchoredPosition );
 			return anchoredPosition;
 		}
