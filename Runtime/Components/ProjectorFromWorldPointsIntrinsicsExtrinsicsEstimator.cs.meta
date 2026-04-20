@@ -8,7 +8,7 @@ MonoImporter:
   - _calibrationCamera: {instanceID: 0}
   - _canvasContainerRect: {instanceID: 0}
   - _rmsErrorText: {instanceID: 0}
-  - _dotSprite: {fileID: 21300000, guid: 5796caad54aa3eb4984343e9b73df7e4, type: 3}
+  - _dotSprite: {fileID: 21300000, guid: ea98d8f1bacbeff4fbc21d6d205e386a, type: 3}
   - _font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
   executionOrder: 0
   icon: {instanceID: 0}
