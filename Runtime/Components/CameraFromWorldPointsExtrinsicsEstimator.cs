@@ -35,6 +35,7 @@ namespace TrackingTools
 
 		[Header("Output")]
 		[SerializeField] Camera _virtualCamera = null;
+		[SerializeField,Tooltip("Without extension name (which is .json)")] string _extrinsicsFileName = "DefaultExtrinsics";
 
 		[Header("UI")]
 		[SerializeField] RectTransform _containerRect = null;
@@ -536,6 +537,7 @@ namespace TrackingTools
 
 			// Save.
 			SaveAnchorPoints();
+			SaveExtrinsics();
 
 			_dirtyCalibration = false;
 		}
@@ -597,6 +599,17 @@ namespace TrackingTools
 			File.WriteAllText( filePath, JsonUtility.ToJson( data ) );
 
 			//Debug.Log( logPrepend + "Saved anchor points to file.\n" + filePath );
+		}
+
+
+		void SaveExtrinsics()
+		{
+			if( string.IsNullOrEmpty( _extrinsicsFileName ) ) return;
+
+			if( !Directory.Exists( TrackingToolsConstants.worldPointSetsDirectoryPath ) ) Directory.CreateDirectory( TrackingToolsConstants.worldPointSetsDirectoryPath );
+			string filePath = TrackingToolsConstants.extrinsicsDirectoryPath + "/" + _extrinsicsFileName + ".json";
+
+			_extrinsicsCalibrator.extrinsics.SaveToFile( filePath );
 		}
 
 
