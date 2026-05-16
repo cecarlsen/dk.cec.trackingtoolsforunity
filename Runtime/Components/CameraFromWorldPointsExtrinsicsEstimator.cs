@@ -63,6 +63,8 @@ namespace TrackingTools
 		[Header("Debug")]
 		[SerializeField] bool _logWarnings = false;
 
+		public Action onCalibrationUpdatedAndSaved;
+
 		//[Header("Other")]
 		//[SerializeField] bool _undistortOnGpu = true;
 
@@ -174,6 +176,7 @@ namespace TrackingTools
 		}
 
 		public Camera virtualCamera => _virtualCamera;
+
 
 
 		static class ShaderIDs
@@ -392,7 +395,10 @@ namespace TrackingTools
 				_virtualAlphaGroup.alpha = _virtualAlpha;
 			}
 
-			if( _worldPointTransforms?.Length >= worldPointTransformCountMin && _dirtyCalibration ) UpdateAndSaveCalibration();
+			if( _worldPointTransforms?.Length >= worldPointTransformCountMin && _dirtyCalibration ){
+				UpdateAndSaveCalibration();
+				if( onCalibrationUpdatedAndSaved != null ) onCalibrationUpdatedAndSaved.Invoke();
+			}
 		}
 
 
@@ -606,10 +612,7 @@ namespace TrackingTools
 		{
 			if( string.IsNullOrEmpty( _extrinsicsFileName ) ) return;
 
-			if( !Directory.Exists( TrackingToolsConstants.worldPointSetsDirectoryPath ) ) Directory.CreateDirectory( TrackingToolsConstants.worldPointSetsDirectoryPath );
-			string filePath = TrackingToolsConstants.extrinsicsDirectoryPath + "/" + _extrinsicsFileName + ".json";
-
-			_extrinsicsCalibrator.extrinsics.SaveToFile( filePath );
+			_extrinsicsCalibrator.extrinsics.SaveToFile( _extrinsicsFileName );
 		}
 
 
