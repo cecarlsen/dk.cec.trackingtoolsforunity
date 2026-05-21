@@ -21,7 +21,7 @@ namespace TrackingTools
 		static readonly string logPrepend = "<b>[" + nameof( Extrinsics ) + "]</b> ";
 
 
-		public void ApplyToTransform( Transform transform, Transform achorTransform = null, bool inverse = false, bool isMirroredRelativeToAnchor = false, bool applyUniformAnchorScale = false )
+		public void ApplyToTransform( Transform transform, Transform achorTransform = null, bool inverse = false, bool isMirroredRelativeToAnchor = false, bool applyUniformAnchorScale = false, bool applyInLocalSpace = false )
 		{
 			var r = rotation;
 			var t = translation;
@@ -38,8 +38,8 @@ namespace TrackingTools
 				if( applyUniformAnchorScale ) t *= achorTransform.localScale.Max();
 				t += achorTransform.position;
 			}
-
-			transform.SetPositionAndRotation( t, r );
+			if( applyInLocalSpace ) transform.SetLocalPositionAndRotation( t, r );
+			else transform.SetPositionAndRotation( t, r );
 		}
 
 

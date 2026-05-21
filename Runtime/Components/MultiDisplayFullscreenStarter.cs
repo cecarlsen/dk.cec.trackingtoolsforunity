@@ -10,7 +10,7 @@ namespace TrackingTools
 {
 	public class MultiDisplayFullscreenStarter : MonoBehaviour
 	{
-		[SerializeField] FullScreenMode _fullscreenMode = FullScreenMode.FullScreenWindow;
+		[SerializeField,Tooltip("Beware that ExclusiveFullScreen can be unstable. FullScreenWindow is recommended.")] FullScreenMode _fullscreenMode = FullScreenMode.FullScreenWindow;
 		[SerializeField] ResolutionRequest _mainDisplayResolutionRequests;
 		[SerializeField] ResolutionRequest[] _additionalDisplayResolutionRequests = new ResolutionRequest[ 1 ];
 

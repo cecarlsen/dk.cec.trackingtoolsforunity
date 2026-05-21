@@ -54,7 +54,7 @@ namespace TrackingTools
 		{
 			Intrinsics intrinsics;
 			if( !Intrinsics.TryLoadFromFile( _intrinsicsFileName, out intrinsics ) ){
-				Debug.LogError( logPrepend + "Intrinsics file '" + _intrinsicsFileName + "' does not exist.\n" );
+				Debug.LogWarning( logPrepend + "Intrinsics file '" + _intrinsicsFileName + "' does not exist.\n" );
 				return;
 			}
 

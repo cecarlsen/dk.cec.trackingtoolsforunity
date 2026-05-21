@@ -197,14 +197,14 @@ namespace TrackingTools
 			intrinsics = null;
 
 			if( !Directory.Exists( TrackingToolsConstants.intrinsicsDirectoryPath ) ) {
-				Debug.LogError( logPrepend + "Directory missing.\n" + TrackingToolsConstants.intrinsicsDirectoryPath );
+				Debug.LogWarning( logPrepend + "Directory missing.\n" + TrackingToolsConstants.intrinsicsDirectoryPath );
 				return false;
 			}
 
 			string filePath = TrackingToolsConstants.intrinsicsDirectoryPath + "/" + fileName;
 			if( !fileName.EndsWith( ".json" ) ) filePath += ".json";
 			if( !File.Exists( filePath ) ) {
-				Debug.LogError( $"{logPrepend}File missing.'\n{filePath}" );
+				Debug.LogWarning( $"{logPrepend}File missing.'\n{filePath}" );
 				return false;
 			}
 
@@ -212,7 +212,7 @@ namespace TrackingTools
 			intrinsics = JsonUtility.FromJson<Intrinsics>( jsonText );
 
 			if( !intrinsics.isValid ) {
-				Debug.LogError( logPrepend + "Failed to load json text:\n" + jsonText );
+				Debug.LogWarning( logPrepend + "Failed to load json text:\n" + jsonText );
 				return false;
 			}
 

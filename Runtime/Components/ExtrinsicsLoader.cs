@@ -13,6 +13,7 @@ namespace TrackingTools
 		[SerializeField,Tooltip( "Optionally make extrinsics relative to anchor." )] Transform _anchorTransform = null;
 		[SerializeField] AutoLoadTime _autoLoadTime = AutoLoadTime.Awake;
 		[SerializeField] bool _inverse = false;
+		[SerializeField] bool _applyInLocalSpace = false;
 		[SerializeField,Tooltip("When enabled, anchorTransform.localScale.Max() will be applied to extrinsics translation")] bool _applyUniformAnchorScale = false;
 		[SerializeField] bool _isMirroredRelativeToAnchor = false;
 		[SerializeField] Vector3 _postRotationLocal = Vector3.zero;
@@ -34,6 +35,30 @@ namespace TrackingTools
 			get => _postRotationLocal;
 			set {
 				_postRotationLocal = value;
+				if( _extrinsics != null ) Apply();
+			}
+		}
+
+		public Vector3 postRotationGlobal {
+			get => _postRotationGlobal;
+			set {
+				_postRotationGlobal = value;
+				if( _extrinsics != null ) Apply();
+			}
+		}
+
+		public Vector3 postOffsetLocal {
+			get => _postOffsetLocal;
+			set {
+				_postOffsetLocal = value;
+				if( _extrinsics != null ) Apply();
+			}
+		}
+
+		public Vector3 postOffsetGlobal {
+			get => _postOffsetGlobal;
+			set {
+				_postOffsetGlobal = value;
 				if( _extrinsics != null ) Apply();
 			}
 		}
@@ -79,7 +104,7 @@ namespace TrackingTools
 		{
 			if( _extrinsics == null ) return;
 
-			_extrinsics.ApplyToTransform( transform, _anchorTransform, _inverse, _isMirroredRelativeToAnchor, _applyUniformAnchorScale );
+			_extrinsics.ApplyToTransform( transform, _anchorTransform, _inverse, _isMirroredRelativeToAnchor, _applyUniformAnchorScale, _applyInLocalSpace );
 
 			if( _anchorTransform && _embedInAnchorTransform ) transform.SetParent( _anchorTransform );
 
